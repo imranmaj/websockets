@@ -88,12 +88,12 @@ impl WebSocket {
             Scheme::Plain => stream,
             Scheme::Secure => stream.into_tls(&parsed_addr.host, tls_config).await?,
         };
-        Ok(Self {
+        Self {
             parsed_addr,
             stream,
-        })
-        // .handshake(handshake_config)
-        // .await
+        }
+        .handshake(handshake_config)
+        .await
     }
 
     async fn handshake(self, handshake_config: HandshakeConfig) -> Result<Self, WebSocketError> {
