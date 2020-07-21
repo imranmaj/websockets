@@ -68,7 +68,7 @@ impl WebSocket {
             .ok_or(WebSocketError::ResolutionError)?;
         Ok(ParsedAddr {
             scheme,
-            host: host.to_owned(),
+            host: host.into(),
             addr,
         })
     }

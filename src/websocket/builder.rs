@@ -16,12 +16,12 @@ impl WebSocketBuilder {
         }
     }
 
-    pub fn tls_config(mut self, tls_config: TlsConfig) -> Self {
+    pub fn tls_config(&mut self, tls_config: TlsConfig) -> &mut Self {
         self.tls_config = Some(tls_config);
         self
     }
 
-    pub fn handshake_config(mut self, handshake_config: HandshakeConfig) -> Self {
+    pub fn handshake_config(&mut self, handshake_config: HandshakeConfig) -> &mut Self {
         self.handshake_config = Some(handshake_config);
         self
     }
