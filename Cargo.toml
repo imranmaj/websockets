@@ -8,6 +8,7 @@ version = "0.1.0"
 
 [dependencies]
 # httparse         = "1.3.4"
+http             = "0.2.1"
 native-tls       = "0.2.4"
 thiserror        = "1.0.20"
 tokio            = { version = "0.2.21", features = ["tcp"] }

@@ -15,7 +15,7 @@ mod tests {
     async fn echo() {
         use crate::WebSocket;
 
-        WebSocket::new().connect("ws://echo.websocket.org/")
+        WebSocket::connect("ws://echo.websocket.org/")
             .await
             .unwrap();
     }
@@ -24,7 +24,7 @@ mod tests {
     async fn echo_tls() {
         use crate::WebSocket;
 
-        WebSocket::new().connect("wss://echo.websocket.org/")
+        WebSocket::connect("wss://echo.websocket.org/")
             .await
             .unwrap();
     }
@@ -33,7 +33,7 @@ mod tests {
     async fn bad_scheme() {
         use crate::WebSocket;
 
-        let resp = WebSocket::new().connect("http://echo.websocket.org").await;
+        let resp = WebSocket::connect("http://echo.websocket.org").await;
         match resp {
             Ok(_) => panic!("expected to fail with bad scheme"),
             Err(e) => println!("{}", e),
