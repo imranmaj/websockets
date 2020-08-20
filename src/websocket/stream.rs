@@ -1,3 +1,4 @@
+use native_tls::TlsConnectorBuilder;
 use std::io::Error as IoError;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -6,20 +7,30 @@ use tokio::net::TcpStream;
 use tokio_native_tls::{TlsConnector as TokioTlsConnector, TlsStream};
 
 use crate::error::WebSocketError;
-use crate::tls_config::TlsConfig;
+// use crate::tls_config::TlsConfig;
 
 #[derive(Debug)]
-pub enum Stream {
+pub(super) enum Stream {
     Plain(TcpStream),
     Tls(TlsStream<TcpStream>),
 }
 
 impl Stream {
-    pub async fn into_tls(self, host: &str, tls_config: TlsConfig) -> Result<Self, WebSocketError> {
+    pub async fn into_tls(
+        self,
+        host: &str,
+        tls_builder: &TlsConnectorBuilder,
+    ) -> Result<Self, WebSocketError> {
         match self {
             Self::Plain(tcp_stream) => {
-                let connector: TokioTlsConnector = tls_config.build()?.into();
-                let tls_stream = connector.connect(host, tcp_stream).await.map_err(|e| WebSocketError::TlsConnectionError(e))?;
+                let connector: TokioTlsConnector = tls_builder
+                    .build()
+                    .map_err(|e| WebSocketError::TlsConfigError(e))?
+                    .into();
+                let tls_stream = connector
+                    .connect(host, tcp_stream)
+                    .await
+                    .map_err(|e| WebSocketError::TlsConnectionError(e))?;
                 Ok(Stream::Tls(tls_stream))
             }
             Self::Tls(_) => Ok(self),
