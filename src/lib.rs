@@ -6,6 +6,7 @@ mod error;
 mod websocket;
 
 pub use websocket::WebSocket;
+pub use websocket::frame::Frame;
 pub use error::WebSocketError;
 // pub use tls_config::{Identity, Certificate, Protocol};
 pub use websocket::builder::{Identity, Certificate, Protocol};
