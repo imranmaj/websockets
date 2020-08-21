@@ -6,18 +6,19 @@ use std::convert::TryFrom;
 
 // use rand::{RngCore, SeedableRng};
 // use rand_chacha::ChaCha20Rng;
+use native_tls::{TlsConnector, TlsConnectorBuilder};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use native_tls::{TlsConnector, TlsConnectorBuilder};
 
+use super::handshake::Handshake;
+use super::parsed_addr::ParsedAddr;
+use super::stream::Stream;
+use super::DataFrameType;
+use super::WebSocket;
+use crate::error::WebSocketError;
 pub use certificate::Certificate;
 pub use identity::Identity;
 pub use protocol::Protocol;
-use super::parsed_addr::ParsedAddr;
-use super::stream::Stream;
-use super::handshake::Handshake;
-use super::WebSocket;
-use crate::error::WebSocketError;
 // use crate::handshake_config::HandshakeConfig;
 // use crate::tls_config::TlsConfig;
 
@@ -66,12 +67,14 @@ impl WebSocketBuilder {
     }
 
     pub fn tls_min_protocol_version(&mut self, protocol: Option<Protocol>) -> &mut Self {
-        self.tls_builder.min_protocol_version(protocol.map(|p| p.into()));
+        self.tls_builder
+            .min_protocol_version(protocol.map(|p| p.into()));
         self
     }
 
     pub fn tls_max_protocol_version(&mut self, protocol: Option<Protocol>) -> &mut Self {
-        self.tls_builder.max_protocol_version(protocol.map(|p| p.into()));
+        self.tls_builder
+            .max_protocol_version(protocol.map(|p| p.into()));
         self
     }
 
@@ -81,7 +84,8 @@ impl WebSocketBuilder {
     }
 
     pub fn tls_danger_accept_invalid_certs(&mut self, accept_invalid_certs: bool) -> &mut Self {
-        self.tls_builder.danger_accept_invalid_certs(accept_invalid_certs);
+        self.tls_builder
+            .danger_accept_invalid_certs(accept_invalid_certs);
         self
     }
 
@@ -90,7 +94,10 @@ impl WebSocketBuilder {
         self
     }
 
-    pub fn tls_danger_accept_invalid_hostnames(&mut self, accept_invalid_hostnames: bool) -> &mut Self {
+    pub fn tls_danger_accept_invalid_hostnames(
+        &mut self,
+        accept_invalid_hostnames: bool,
+    ) -> &mut Self {
         self.tls_builder
             .danger_accept_invalid_hostnames(accept_invalid_hostnames);
         self
@@ -112,7 +119,7 @@ impl WebSocketBuilder {
         //     .handshake_config
         //     .take()
         //     .unwrap_or(HandshakeConfig::new());
-        let parsed_addr  = ParsedAddr::try_from(url)?;
+        let parsed_addr = ParsedAddr::try_from(url)?;
 
         // let ws = connect(&parsed_addr, tls_config).await?;
         let stream = Stream::Plain(
@@ -122,20 +129,35 @@ impl WebSocketBuilder {
         );
         let stream = match &*parsed_addr.scheme {
             "ws" => stream,
-            "wss" => stream.into_tls(&parsed_addr.host, &self.tls_builder).await?,
+            "wss" => {
+                stream
+                    .into_tls(&parsed_addr.host, &self.tls_builder)
+                    .await?
+            }
             _ => return Err(WebSocketError::SchemeError),
         };
-        let mut ws = WebSocket { stream, closed: false };
+        let mut ws = WebSocket {
+            stream,
+            closed: false,
+            last_data_frame_type: DataFrameType::None,
+        };
         // handshake(ws, &parsed_addr, handshake_config).await
-        let handshake = Handshake::new(&parsed_addr, &self.additional_handshake_headers, &self.subprotocols)?;
+        let handshake = Handshake::new(
+            &parsed_addr,
+            &self.additional_handshake_headers,
+            &self.subprotocols,
+        )?;
         // unimplemented!();
-        ws.stream.write_all(&handshake.make_request()).await.map_err(|e| WebSocketError::WriteError(e))?;
+        ws.stream
+            .write_all(&handshake.make_request())
+            .await
+            .map_err(|e| WebSocketError::WriteError(e))?;
         let mut resp = Vec::new();
         ws.stream
             .read_to_end(&mut resp)
             .await
             .map_err(|e| WebSocketError::ReadError(e))?;
-        handshake.check_response(&resp).map(|_| ws)
+        handshake.check_response(&resp).map(|_e| ws)
     }
 }
 
@@ -169,5 +191,5 @@ impl WebSocketBuilder {
 //         .read_to_end(&mut resp)
 //         .await
 //         .map_err(|e| WebSocketError::ReadError(e))?;
-//     handshake.check_response(&resp).map(|_| ws)
+//     handshake.check_response(&resp).map(|_e| ws)
 // }

@@ -1,15 +1,12 @@
 #![forbid(unsafe_code)]
 
 mod error;
-// mod tls_config;
-// mod handshake_config;
 mod websocket;
 
-pub use websocket::WebSocket;
-pub use websocket::frame::Frame;
 pub use error::WebSocketError;
-// pub use tls_config::{Identity, Certificate, Protocol};
-pub use websocket::builder::{Identity, Certificate, Protocol};
+pub use websocket::frame::Frame;
+pub use websocket::WebSocket;
+pub use websocket::builder::{Certificate, Identity, Protocol};
 
 #[cfg(test)]
 mod tests {

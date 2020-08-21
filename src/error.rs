@@ -1,5 +1,4 @@
 use native_tls::Error as NativeTlsError;
-use rand::Error as RandError;
 use std::io::Error as IoError;
 use thiserror::Error;
 use url::ParseError;
@@ -28,7 +27,7 @@ pub enum WebSocketError {
     ShutdownError(IoError),
 
     // handshake errors
-    #[error("error invalid handshake accept key from server")]
+    #[error("invalid handshake accept key from server")]
     KeyError,
 
     // frame errors
@@ -36,6 +35,10 @@ pub enum WebSocketError {
     ControlFrameTooLargeError,
     #[error("payload is too large")]
     PayloadTooLargeError,
+    #[error("received frame is invalid")]
+    InvalidFrameError,
+    #[error("received masked frame")]
+    ReceivedMaskedFrameError,
 
     // url errors
     #[error("url could not be parsed")]
@@ -56,8 +59,4 @@ pub enum WebSocketError {
     ReadError(IoError),
     #[error("could not write to WebSocket")]
     WriteError(IoError),
-
-    // other
-    // #[error("error using rng")]
-    // RngError(RandError),
 }

@@ -10,14 +10,14 @@ pub(super) struct Handshake {
     key: String,
     version: usize,
     additional_headers: Vec<(String, String)>,
-    subprotocols: Vec<String>
+    subprotocols: Vec<String>,
 }
 
 impl Handshake {
     pub(super) fn new(
         parsed_addr: &ParsedAddr,
         additional_handshake_headers: &Vec<(String, String)>,
-        subprotocols: &Vec<String>
+        subprotocols: &Vec<String>,
     ) -> Result<Self, WebSocketError> {
         let mut rand_bytes = Vec::with_capacity(16);
         let mut rng = ChaCha20Rng::from_entropy();

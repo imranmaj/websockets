@@ -6,7 +6,10 @@ pub struct Identity(NativeTlsIdentity);
 
 impl Identity {
     pub fn from_pkcs12(der: &[u8], password: &str) -> Result<Self, WebSocketError> {
-        Ok(Self(NativeTlsIdentity::from_pkcs12(der, password).map_err(|e| WebSocketError::IdentityParseError(e))?))
+        Ok(Self(
+            NativeTlsIdentity::from_pkcs12(der, password)
+                .map_err(|e| WebSocketError::IdentityParseError(e))?,
+        ))
     }
 }
 

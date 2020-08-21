@@ -1,5 +1,5 @@
-use std::net::{SocketAddr, ToSocketAddrs};
 use std::convert::TryFrom;
+use std::net::{SocketAddr, ToSocketAddrs};
 
 use url::Url;
 
