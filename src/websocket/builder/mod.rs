@@ -139,7 +139,7 @@ impl WebSocketBuilder {
         let mut ws = WebSocket {
             stream,
             closed: false,
-            last_data_frame_type: DataFrameType::None,
+            last_data_frame_type: DataFrameType::Control,
         };
         // handshake(ws, &parsed_addr, handshake_config).await
         let handshake = Handshake::new(

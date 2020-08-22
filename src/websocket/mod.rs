@@ -15,7 +15,7 @@ use stream::Stream;
 enum DataFrameType {
     Text,
     Binary,
-    None,
+    Control,
 }
 
 #[derive(Debug)]
@@ -38,20 +38,24 @@ impl WebSocket {
         if self.closed {
             return Err(WebSocketError::WebSocketClosedError);
         }
-        let raw_frame = frame.into_raw();
-        unimplemented!()
+        let raw_frame = frame.into_raw()?;
+        self.stream
+            .write_all(&raw_frame)
+            .await
+            .map_err(|e| WebSocketError::WriteError(e))?;
+        Ok(())
     }
 
     pub async fn receive(&mut self) -> Result<Frame, WebSocketError> {
         if self.closed {
             return Err(WebSocketError::WebSocketClosedError);
         }
-        let frame = Frame::read_from_stream(&mut self.stream, &self.last_data_frame_type).await?;
+        let frame = Frame::read_from_websocket(self).await?;
         // remember last data frame type in case we get continuation frames
-        self.last_data_frame_type = match frame {
-            Frame::Text { .. } => DataFrameType::Text,
-            Frame::Binary { .. } => DataFrameType::Binary,
-            _ => self.last_data_frame_type,
+        match frame {
+            Frame::Text { .. } => self.last_data_frame_type = DataFrameType::Text,
+            Frame::Binary { .. } => self.last_data_frame_type =  DataFrameType::Binary,
+            _ => (),
         };
         // handle incoming frames
         match &frame {
@@ -78,14 +82,16 @@ impl WebSocket {
     }
 
     pub async fn close(&mut self) -> Result<(), WebSocketError> {
-        if !self.closed {
+        if self.closed {
+            Err(WebSocketError::WebSocketClosedError)
+        } else {
             self.send(Frame::Close { payload: None }).await?;
             self.closed = true;
             self.stream
                 .shutdown()
                 .await
                 .map_err(|e| WebSocketError::ShutdownError(e))?;
+            Ok(())
         }
-        Ok(())
     }
 }
