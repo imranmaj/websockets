@@ -35,10 +35,27 @@ impl Handshake {
     }
 
     pub(super) fn make_request(&self) -> Vec<u8> {
-        unimplemented!()
+        let mut headers = Vec::new();
+        headers.push(("Host".into(), self.host.clone()));
+        headers.push(("Upgrade".into(), "websocket".into()));
+        headers.push(("Connection".into(), "Upgrade".into()));
+        headers.push(("Sec-WebSocket-Key".into(), self.key.clone()));
+        headers.push(("Sec-Websocket-Version".into(), self.version.to_string()));
+        if self.subprotocols.len() > 0 {
+            headers.push(("Sec-WebSocket-Protocol".into(), self.subprotocols.join(", ")));
+        }
+        for header in &self.additional_headers {
+            headers.push(header.clone());
+        }
+
+        let mut req = format!("GET {} HTTP/1.1\r\n", self.path);
+        for (field, value) in headers {
+            req.push_str(&format!("{}: {}\r\n", field, value));
+        }
+        req.into_bytes()
     }
 
-    pub(super) fn check_response(&self, resp: &[u8]) -> Result<(), WebSocketError> {
+    pub(super) fn check_response(&self, resp: &[u8]) -> Result<Option<Vec<String>>, WebSocketError> {
         unimplemented!()
     }
 }

@@ -190,7 +190,7 @@ impl Frame {
             0x0 => match ws.last_data_frame_type {
                 DataFrameType::Text => Ok(Self::Text {
                     payload: String::from_utf8(payload)
-                        .map_err(|e| WebSocketError::InvalidFrameError)?,
+                        .map_err(|_e| WebSocketError::InvalidFrameError)?,
                     continuation: true,
                     fin,
                 }),
@@ -203,7 +203,7 @@ impl Frame {
             },
             0x1 => Ok(Self::Text {
                 payload: String::from_utf8(payload)
-                    .map_err(|e| WebSocketError::InvalidFrameError)?,
+                    .map_err(|_e| WebSocketError::InvalidFrameError)?,
                 continuation: false,
                 fin,
             }),

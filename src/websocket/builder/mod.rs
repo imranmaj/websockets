@@ -140,6 +140,7 @@ impl WebSocketBuilder {
             stream,
             closed: false,
             last_data_frame_type: DataFrameType::Control,
+            accepted_subprotocols: None
         };
         // handshake(ws, &parsed_addr, handshake_config).await
         let handshake = Handshake::new(
@@ -157,7 +158,8 @@ impl WebSocketBuilder {
             .read_to_end(&mut resp)
             .await
             .map_err(|e| WebSocketError::ReadError(e))?;
-        handshake.check_response(&resp).map(|_e| ws)
+        ws.accepted_subprotocols = handshake.check_response(&resp)?;
+        Ok(ws)
     }
 }
 

@@ -23,6 +23,7 @@ pub struct WebSocket {
     stream: Stream,
     closed: bool,
     last_data_frame_type: DataFrameType,
+    accepted_subprotocols: Option<Vec<String>>,
 }
 
 impl WebSocket {
@@ -32,6 +33,10 @@ impl WebSocket {
 
     pub async fn connect(url: &str) -> Result<Self, WebSocketError> {
         WebSocketBuilder::new().connect(url).await
+    }
+
+    pub fn accepted_subprotocols(&self) -> &Option<Vec<String>> {
+        &self.accepted_subprotocols
     }
 
     pub async fn send(&mut self, frame: Frame) -> Result<(), WebSocketError> {
@@ -54,7 +59,7 @@ impl WebSocket {
         // remember last data frame type in case we get continuation frames
         match frame {
             Frame::Text { .. } => self.last_data_frame_type = DataFrameType::Text,
-            Frame::Binary { .. } => self.last_data_frame_type =  DataFrameType::Binary,
+            Frame::Binary { .. } => self.last_data_frame_type = DataFrameType::Binary,
             _ => (),
         };
         // handle incoming frames
