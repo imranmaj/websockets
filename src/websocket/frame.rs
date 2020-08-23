@@ -4,9 +4,9 @@ use std::sync::Mutex;
 use once_cell::sync::OnceCell;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use super::{WebSocket, DataFrameType};
+use super::{FrameType, WebSocket};
 use crate::error::WebSocketError;
 
 const U16_MAX_MINUS_ONE: usize = (u16::MAX - 1) as usize;
@@ -38,7 +38,7 @@ pub enum Frame {
 }
 
 impl Frame {
-    pub(super) fn into_raw(self) -> Result<Vec<u8>, WebSocketError> {
+    pub(super) async fn send(self, ws: &mut WebSocket) -> Result<Vec<u8>, WebSocketError> {
         // calculate before moving payload out of self
         let is_control = self.is_control();
         let opcode = self.opcode();
@@ -100,6 +100,10 @@ impl Frame {
         }
 
         raw_frame.append(&mut payload);
+        ws.stream
+            .write_all(&raw_frame)
+            .await
+            .map_err(|e| WebSocketError::WriteError(e))?;
         Ok(raw_frame)
     }
 
@@ -150,14 +154,16 @@ impl Frame {
 
     pub(super) async fn read_from_websocket(ws: &mut WebSocket) -> Result<Self, WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.2
-        let fin_and_opcode = ws.stream
+        let fin_and_opcode = ws
+            .stream
             .read_u8()
             .await
             .map_err(|e| WebSocketError::ReadError(e))?;
         let fin: bool = fin_and_opcode & 0b10000000_u8 != 0;
         let opcode = fin_and_opcode & 0b00001111_u8;
 
-        let mask_and_payload_len_first_byte = ws.stream
+        let mask_and_payload_len_first_byte = ws
+            .stream
             .read_u8()
             .await
             .map_err(|e| WebSocketError::ReadError(e))?;
@@ -169,11 +175,13 @@ impl Frame {
         let payload_len_first_byte = mask_and_payload_len_first_byte & 0b01111111_u8;
         let payload_len = match payload_len_first_byte {
             0..=125 => payload_len_first_byte as usize,
-            126 => ws.stream
+            126 => ws
+                .stream
                 .read_u16()
                 .await
                 .map_err(|e| WebSocketError::ReadError(e))? as usize,
-            127 => ws.stream
+            127 => ws
+                .stream
                 .read_u64()
                 .await
                 .map_err(|e| WebSocketError::ReadError(e))? as usize,
@@ -188,18 +196,18 @@ impl Frame {
 
         match opcode {
             0x0 => match ws.last_data_frame_type {
-                DataFrameType::Text => Ok(Self::Text {
+                FrameType::Text => Ok(Self::Text {
                     payload: String::from_utf8(payload)
                         .map_err(|_e| WebSocketError::InvalidFrameError)?,
                     continuation: true,
                     fin,
                 }),
-                DataFrameType::Binary => Ok(Self::Binary {
+                FrameType::Binary => Ok(Self::Binary {
                     payload,
                     continuation: true,
                     fin,
                 }),
-                DataFrameType::Control => Err(WebSocketError::InvalidFrameError),
+                FrameType::Control => Err(WebSocketError::InvalidFrameError),
             },
             0x1 => Ok(Self::Text {
                 payload: String::from_utf8(payload)

@@ -1,7 +1,10 @@
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
+use tokio::io::{AsyncWriteExt, AsyncReadExt};
+
 use super::parsed_addr::ParsedAddr;
+use super::WebSocket;
 use crate::error::WebSocketError;
 
 pub(super) struct Handshake {
@@ -19,6 +22,7 @@ impl Handshake {
         additional_handshake_headers: &Vec<(String, String)>,
         subprotocols: &Vec<String>,
     ) -> Result<Self, WebSocketError> {
+        // https://tools.ietf.org/html/rfc6455#section-5.3
         let mut rand_bytes = Vec::with_capacity(16);
         let mut rng = ChaCha20Rng::from_entropy();
         rng.fill_bytes(&mut rand_bytes);
@@ -34,7 +38,8 @@ impl Handshake {
         })
     }
 
-    pub(super) fn make_request(&self) -> Vec<u8> {
+    pub(super) async fn send_request(&self, ws: &mut WebSocket) -> Result<(), WebSocketError> {
+        // https://tools.ietf.org/html/rfc6455#section-1.3
         let mut headers = Vec::new();
         headers.push(("Host".into(), self.host.clone()));
         headers.push(("Upgrade".into(), "websocket".into()));
@@ -42,7 +47,10 @@ impl Handshake {
         headers.push(("Sec-WebSocket-Key".into(), self.key.clone()));
         headers.push(("Sec-Websocket-Version".into(), self.version.to_string()));
         if self.subprotocols.len() > 0 {
-            headers.push(("Sec-WebSocket-Protocol".into(), self.subprotocols.join(", ")));
+            headers.push((
+                "Sec-WebSocket-Protocol".into(),
+                self.subprotocols.join(", "),
+            ));
         }
         for header in &self.additional_headers {
             headers.push(header.clone());
@@ -52,10 +60,18 @@ impl Handshake {
         for (field, value) in headers {
             req.push_str(&format!("{}: {}\r\n", field, value));
         }
-        req.into_bytes()
+        req.push_str("\r\n"); // end of request
+        ws.stream
+            .write_all(req.as_bytes())
+            .await
+            .map_err(|e| WebSocketError::WriteError(e))?;
+        Ok(())
     }
 
-    pub(super) fn check_response(&self, resp: &[u8]) -> Result<Option<Vec<String>>, WebSocketError> {
+    pub(super) async fn check_response(
+        &self,
+        ws: &mut WebSocket,
+    ) -> Result<Option<Vec<String>>, WebSocketError> {
         unimplemented!()
     }
 }

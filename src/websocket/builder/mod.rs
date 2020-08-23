@@ -7,13 +7,12 @@ use std::convert::TryFrom;
 // use rand::{RngCore, SeedableRng};
 // use rand_chacha::ChaCha20Rng;
 use native_tls::{TlsConnector, TlsConnectorBuilder};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 use super::handshake::Handshake;
 use super::parsed_addr::ParsedAddr;
 use super::stream::Stream;
-use super::DataFrameType;
+use super::FrameType;
 use super::WebSocket;
 use crate::error::WebSocketError;
 pub use certificate::Certificate;
@@ -139,26 +138,18 @@ impl WebSocketBuilder {
         let mut ws = WebSocket {
             stream,
             closed: false,
-            last_data_frame_type: DataFrameType::Control,
+            last_data_frame_type: FrameType::Control,
             accepted_subprotocols: None
         };
-        // handshake(ws, &parsed_addr, handshake_config).await
+
+        // perform opening handshake
         let handshake = Handshake::new(
             &parsed_addr,
             &self.additional_handshake_headers,
             &self.subprotocols,
         )?;
-        // unimplemented!();
-        ws.stream
-            .write_all(&handshake.make_request())
-            .await
-            .map_err(|e| WebSocketError::WriteError(e))?;
-        let mut resp = Vec::new();
-        ws.stream
-            .read_to_end(&mut resp)
-            .await
-            .map_err(|e| WebSocketError::ReadError(e))?;
-        ws.accepted_subprotocols = handshake.check_response(&resp)?;
+        handshake.send_request(&mut ws).await?;
+        ws.accepted_subprotocols = handshake.check_response(&mut ws).await?;
         Ok(ws)
     }
 }

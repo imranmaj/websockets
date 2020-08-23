@@ -12,7 +12,7 @@ use frame::Frame;
 use stream::Stream;
 
 #[derive(Debug)]
-enum DataFrameType {
+enum FrameType {
     Text,
     Binary,
     Control,
@@ -22,7 +22,7 @@ enum DataFrameType {
 pub struct WebSocket {
     stream: Stream,
     closed: bool,
-    last_data_frame_type: DataFrameType,
+    last_data_frame_type: FrameType,
     accepted_subprotocols: Option<Vec<String>>,
 }
 
@@ -43,11 +43,12 @@ impl WebSocket {
         if self.closed {
             return Err(WebSocketError::WebSocketClosedError);
         }
-        let raw_frame = frame.into_raw()?;
-        self.stream
-            .write_all(&raw_frame)
-            .await
-            .map_err(|e| WebSocketError::WriteError(e))?;
+        frame.send(self).await?;
+        // let raw_frame = frame.into_raw()?;
+        // self.stream
+        //     .write_all(&raw_frame)
+        //     .await
+        //     .map_err(|e| WebSocketError::WriteError(e))?;
         Ok(())
     }
 
@@ -58,8 +59,8 @@ impl WebSocket {
         let frame = Frame::read_from_websocket(self).await?;
         // remember last data frame type in case we get continuation frames
         match frame {
-            Frame::Text { .. } => self.last_data_frame_type = DataFrameType::Text,
-            Frame::Binary { .. } => self.last_data_frame_type = DataFrameType::Binary,
+            Frame::Text { .. } => self.last_data_frame_type = FrameType::Text,
+            Frame::Binary { .. } => self.last_data_frame_type = FrameType::Binary,
             _ => (),
         };
         // handle incoming frames
@@ -71,7 +72,7 @@ impl WebSocket {
                 };
                 self.send(pong).await?;
             }
-            // echo close frame and close
+            // echo close frame and close (https://tools.ietf.org/html/rfc6455#section-1.4)
             Frame::Close { payload } => {
                 let close = Frame::Close {
                     payload: payload
@@ -87,6 +88,7 @@ impl WebSocket {
     }
 
     pub async fn close(&mut self) -> Result<(), WebSocketError> {
+        // https://tools.ietf.org/html/rfc6455#section-5.5.1
         if self.closed {
             Err(WebSocketError::WebSocketClosedError)
         } else {
