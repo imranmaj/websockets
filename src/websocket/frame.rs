@@ -195,7 +195,7 @@ impl Frame {
             .map_err(|e| WebSocketError::ReadError(e))?;
 
         match opcode {
-            0x0 => match ws.last_data_frame_type {
+            0x0 => match ws.last_frame_type {
                 FrameType::Text => Ok(Self::Text {
                     payload: String::from_utf8(payload)
                         .map_err(|_e| WebSocketError::InvalidFrameError)?,

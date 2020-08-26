@@ -7,6 +7,7 @@ use std::convert::TryFrom;
 // use rand::{RngCore, SeedableRng};
 // use rand_chacha::ChaCha20Rng;
 use native_tls::{TlsConnector, TlsConnectorBuilder};
+use tokio::io::BufStream;
 use tokio::net::TcpStream;
 
 use super::handshake::Handshake;
@@ -136,10 +137,11 @@ impl WebSocketBuilder {
             _ => return Err(WebSocketError::SchemeError),
         };
         let mut ws = WebSocket {
-            stream,
+            stream: BufStream::new(stream),
             closed: false,
-            last_data_frame_type: FrameType::Control,
-            accepted_subprotocols: None
+            last_frame_type: FrameType::Control,
+            accepted_subprotocols: None,
+            handshake_response_headers: None,
         };
 
         // perform opening handshake
@@ -149,7 +151,7 @@ impl WebSocketBuilder {
             &self.subprotocols,
         )?;
         handshake.send_request(&mut ws).await?;
-        ws.accepted_subprotocols = handshake.check_response(&mut ws).await?;
+        handshake.check_response(&mut ws).await?;
         Ok(ws)
     }
 }

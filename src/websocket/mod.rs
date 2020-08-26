@@ -4,7 +4,7 @@ mod handshake;
 mod parsed_addr;
 mod stream;
 
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncWriteExt, BufStream};
 
 use crate::error::WebSocketError;
 use builder::WebSocketBuilder;
@@ -20,10 +20,11 @@ enum FrameType {
 
 #[derive(Debug)]
 pub struct WebSocket {
-    stream: Stream,
+    stream: BufStream<Stream>,
     closed: bool,
-    last_data_frame_type: FrameType,
+    last_frame_type: FrameType,
     accepted_subprotocols: Option<Vec<String>>,
+    handshake_response_headers: Option<Vec<(String, String)>>,
 }
 
 impl WebSocket {
@@ -59,8 +60,8 @@ impl WebSocket {
         let frame = Frame::read_from_websocket(self).await?;
         // remember last data frame type in case we get continuation frames
         match frame {
-            Frame::Text { .. } => self.last_data_frame_type = FrameType::Text,
-            Frame::Binary { .. } => self.last_data_frame_type = FrameType::Binary,
+            Frame::Text { .. } => self.last_frame_type = FrameType::Text,
+            Frame::Binary { .. } => self.last_frame_type = FrameType::Binary,
             _ => (),
         };
         // handle incoming frames

@@ -7,7 +7,6 @@ use tokio::net::TcpStream;
 use tokio_native_tls::{TlsConnector as TokioTlsConnector, TlsStream};
 
 use crate::error::WebSocketError;
-// use crate::tls_config::TlsConfig;
 
 #[derive(Debug)]
 pub(super) enum Stream {

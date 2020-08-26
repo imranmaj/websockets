@@ -31,6 +31,8 @@ pub enum WebSocketError {
     KeyError,
     #[error("invalid handshake response")]
     InvalidHandshakeError,
+    #[error("failed handhshake")]
+    HandhshakeFailed,
 
     // frame errors
     #[error("control frame has payload larger than 125 bytes")]

@@ -1,11 +1,15 @@
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+use regex::Regex;
 
 use super::parsed_addr::ParsedAddr;
 use super::WebSocket;
 use crate::error::WebSocketError;
+
+// length of "HTTP/1.1 101 Switching Protocols"
+const PROBABLE_STATUS_LINE_LENGTH: usize = 34;
 
 pub(super) struct Handshake {
     path: String,
@@ -40,6 +44,7 @@ impl Handshake {
 
     pub(super) async fn send_request(&self, ws: &mut WebSocket) -> Result<(), WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-1.3
+        // https://tools.ietf.org/html/rfc6455#section-4.1
         let mut headers = Vec::new();
         headers.push(("Host".into(), self.host.clone()));
         headers.push(("Upgrade".into(), "websocket".into()));
@@ -68,10 +73,25 @@ impl Handshake {
         Ok(())
     }
 
-    pub(super) async fn check_response(
-        &self,
-        ws: &mut WebSocket,
-    ) -> Result<Option<Vec<String>>, WebSocketError> {
+    pub(super) async fn check_response(&self, ws: &mut WebSocket) -> Result<(), WebSocketError> {
+        // https://tools.ietf.org/html/rfc6455#section-1.3
+        // https://tools.ietf.org/html/rfc6455#section-4.2.2
+        // sec-websocket-accept
+        // sec-websocket-version
+        // sec-websocket-protocol
+        let status_line_regex = Regex::new(r"HTTP/\d+\.\d+ (\d{3}) (.+)\r\n").unwrap();
+        let mut status_line = String::with_capacity(PROBABLE_STATUS_LINE_LENGTH);
+        ws.stream
+            .read_line(&mut status_line)
+            .await
+            .map_err(|e| WebSocketError::ReadError(e))?;
+        let captures = status_line_regex.captures(&status_line).ok_or(WebSocketError::InvalidHandshakeError)?;
+        let status_code = &captures[1];
+        // let reason_phrase = captures.get(2).ok_or(WebSocketError::InvalidHandshakeError);
+        
+
+        // set accepted subprotocols
+        // set handshake response headers
         unimplemented!()
     }
 }
