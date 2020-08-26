@@ -11,6 +11,7 @@ use crate::error::WebSocketError;
 // length of "HTTP/1.1 101 Switching Protocols"
 const PROBABLE_STATUS_LINE_LENGTH: usize = 34;
 
+#[derive(Debug)]
 pub(super) struct Handshake {
     path: String,
     host: String,
@@ -27,7 +28,7 @@ impl Handshake {
         subprotocols: &Vec<String>,
     ) -> Result<Self, WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.3
-        let mut rand_bytes = Vec::with_capacity(16);
+        let mut rand_bytes = vec![0; 16];
         let mut rng = ChaCha20Rng::from_entropy();
         rng.fill_bytes(&mut rand_bytes);
         let key = base64::encode(rand_bytes);
@@ -89,7 +90,7 @@ impl Handshake {
         let status_code = &captures[1];
         // let reason_phrase = captures.get(2).ok_or(WebSocketError::InvalidHandshakeError);
         
-
+        println!("{}", status_code);
         // set accepted subprotocols
         // set handshake response headers
         unimplemented!()

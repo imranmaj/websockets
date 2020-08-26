@@ -1,4 +1,5 @@
-use native_tls::TlsConnectorBuilder;
+// use native_tls::TlsConnectorBuilder;
+use native_tls::TlsConnector as NativeTlsTlsConnector;
 use std::io::Error as IoError;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -15,16 +16,11 @@ pub(super) enum Stream {
 }
 
 impl Stream {
-    pub async fn into_tls(
-        self,
-        host: &str,
-        tls_builder: &TlsConnectorBuilder,
-    ) -> Result<Self, WebSocketError> {
+    pub async fn into_tls(self, host: &str) -> Result<Self, WebSocketError> {
         match self {
             Self::Plain(tcp_stream) => {
-                let connector: TokioTlsConnector = tls_builder
-                    .build()
-                    .map_err(|e| WebSocketError::TlsConfigError(e))?
+                let connector: TokioTlsConnector = NativeTlsTlsConnector::new()
+                    .map_err(|e| WebSocketError::TlsConnectionError(e))?
                     .into();
                 let tls_stream = connector
                     .connect(host, tcp_stream)

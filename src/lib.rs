@@ -6,7 +6,7 @@ mod websocket;
 pub use error::WebSocketError;
 pub use websocket::frame::Frame;
 pub use websocket::WebSocket;
-pub use websocket::builder::{Certificate, Identity, Protocol};
+// pub use websocket::builder::{Certificate, Identity, Protocol};
 
 #[cfg(test)]
 mod tests {
@@ -33,9 +33,8 @@ mod tests {
         use crate::WebSocket;
 
         let resp = WebSocket::connect("http://echo.websocket.org").await;
-        match resp {
-            Ok(_) => panic!("expected to fail with bad scheme"),
-            Err(e) => println!("{}", e),
+        if let Ok(_) = resp {
+            panic!("expected to fail with bad scheme");
         }
     }
 }

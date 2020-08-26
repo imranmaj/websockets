@@ -7,14 +7,14 @@ use url::ParseError;
 #[derive(Error, Debug)]
 pub enum WebSocketError {
     // TLS configuration errors
-    #[error("could not use given TLS configuration")]
-    TlsConfigError(NativeTlsError),
-    #[error("could not use certificate")]
-    CertificateError(NativeTlsError),
-    #[error("could not convert certficate to DER")]
-    DerConversionError(NativeTlsError),
-    #[error("could not parse PKCS #12 archive")]
-    IdentityParseError(NativeTlsError),
+    // #[error("could not use given TLS configuration")]
+    // TlsConfigError(NativeTlsError),
+    // #[error("could not use certificate")]
+    // CertificateError(NativeTlsError),
+    // #[error("could not convert certficate to DER")]
+    // DerConversionError(NativeTlsError),
+    // #[error("could not parse PKCS #12 archive")]
+    // IdentityParseError(NativeTlsError),
 
     // connection errors
     #[error("could not connect using TCP")]

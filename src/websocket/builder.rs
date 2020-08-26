@@ -1,12 +1,12 @@
-mod certificate;
-mod identity;
-mod protocol;
+// mod certificate;
+// mod identity;
+// mod protocol;
 
 use std::convert::TryFrom;
 
 // use rand::{RngCore, SeedableRng};
 // use rand_chacha::ChaCha20Rng;
-use native_tls::{TlsConnector, TlsConnectorBuilder};
+// use native_tls::{TlsConnector, TlsConnectorBuilder};
 use tokio::io::BufStream;
 use tokio::net::TcpStream;
 
@@ -16,15 +16,15 @@ use super::stream::Stream;
 use super::FrameType;
 use super::WebSocket;
 use crate::error::WebSocketError;
-pub use certificate::Certificate;
-pub use identity::Identity;
-pub use protocol::Protocol;
+// pub use certificate::Certificate;
+// pub use identity::Identity;
+// pub use protocol::Protocol;
 // use crate::handshake_config::HandshakeConfig;
 // use crate::tls_config::TlsConfig;
 
 pub struct WebSocketBuilder {
     // tls_config: Option<TlsConfig>,
-    tls_builder: TlsConnectorBuilder,
+    // tls_builder: TlsConnectorBuilder,
     // handshake_config: Option<HandshakeConfig>,
     additional_handshake_headers: Vec<(String, String)>,
     subprotocols: Vec<String>,
@@ -33,75 +33,75 @@ pub struct WebSocketBuilder {
 impl WebSocketBuilder {
     pub(super) fn new() -> Self {
         Self {
-            tls_builder: TlsConnector::builder(),
+            // tls_builder: TlsConnector::builder(),
             additional_handshake_headers: Vec::new(),
             subprotocols: Vec::new(),
         }
     }
 
-    pub fn handshake_add_header(&mut self, header_name: &str, header_value: &str) -> &mut Self {
+    pub fn add_header(&mut self, header_name: &str, header_value: &str) -> &mut Self {
         self.additional_handshake_headers
             .push((header_name.into(), header_value.into()));
         self
     }
 
-    pub fn handshake_remove_header(&mut self, header_name: &str) -> &mut Self {
+    pub fn remove_header(&mut self, header_name: &str) -> &mut Self {
         self.additional_handshake_headers
             .retain(|header| header.0 != header_name);
         self
     }
 
-    pub fn handshake_add_subprotocol(&mut self, subprotocol: &str) -> &mut Self {
+    pub fn add_subprotocol(&mut self, subprotocol: &str) -> &mut Self {
         self.subprotocols.push(subprotocol.into());
         self
     }
 
-    pub fn handshake_remove_subprotocol(&mut self, subprotocol: &str) -> &mut Self {
+    pub fn remove_subprotocol(&mut self, subprotocol: &str) -> &mut Self {
         self.subprotocols.retain(|s| s != subprotocol);
         self
     }
 
-    pub fn tls_identity(&mut self, identity: Identity) -> &mut Self {
-        self.tls_builder.identity(identity.into());
-        self
-    }
+    // pub fn tls_identity(&mut self, identity: Identity) -> &mut Self {
+    //     self.tls_builder.identity(identity.into());
+    //     self
+    // }
 
-    pub fn tls_min_protocol_version(&mut self, protocol: Option<Protocol>) -> &mut Self {
-        self.tls_builder
-            .min_protocol_version(protocol.map(|p| p.into()));
-        self
-    }
+    // pub fn tls_min_protocol_version(&mut self, protocol: Option<Protocol>) -> &mut Self {
+    //     self.tls_builder
+    //         .min_protocol_version(protocol.map(|p| p.into()));
+    //     self
+    // }
 
-    pub fn tls_max_protocol_version(&mut self, protocol: Option<Protocol>) -> &mut Self {
-        self.tls_builder
-            .max_protocol_version(protocol.map(|p| p.into()));
-        self
-    }
+    // pub fn tls_max_protocol_version(&mut self, protocol: Option<Protocol>) -> &mut Self {
+    //     self.tls_builder
+    //         .max_protocol_version(protocol.map(|p| p.into()));
+    //     self
+    // }
 
-    pub fn tls_add_root_certificate(&mut self, cert: Certificate) -> &mut Self {
-        self.tls_builder.add_root_certificate(cert.into());
-        self
-    }
+    // pub fn tls_add_root_certificate(&mut self, cert: Certificate) -> &mut Self {
+    //     self.tls_builder.add_root_certificate(cert.into());
+    //     self
+    // }
 
-    pub fn tls_danger_accept_invalid_certs(&mut self, accept_invalid_certs: bool) -> &mut Self {
-        self.tls_builder
-            .danger_accept_invalid_certs(accept_invalid_certs);
-        self
-    }
+    // pub fn tls_danger_accept_invalid_certs(&mut self, accept_invalid_certs: bool) -> &mut Self {
+    //     self.tls_builder
+    //         .danger_accept_invalid_certs(accept_invalid_certs);
+    //     self
+    // }
 
-    pub fn tls_use_sni(&mut self, use_sni: bool) -> &mut Self {
-        self.tls_builder.use_sni(use_sni);
-        self
-    }
+    // pub fn tls_use_sni(&mut self, use_sni: bool) -> &mut Self {
+    //     self.tls_builder.use_sni(use_sni);
+    //     self
+    // }
 
-    pub fn tls_danger_accept_invalid_hostnames(
-        &mut self,
-        accept_invalid_hostnames: bool,
-    ) -> &mut Self {
-        self.tls_builder
-            .danger_accept_invalid_hostnames(accept_invalid_hostnames);
-        self
-    }
+    // pub fn tls_danger_accept_invalid_hostnames(
+    //     &mut self,
+    //     accept_invalid_hostnames: bool,
+    // ) -> &mut Self {
+    //     self.tls_builder
+    //         .danger_accept_invalid_hostnames(accept_invalid_hostnames);
+    //     self
+    // }
 
     // pub fn tls_config(&mut self, tls_config: TlsConfig) -> &mut Self {
     //     self.tls_config = Some(tls_config);
@@ -131,7 +131,8 @@ impl WebSocketBuilder {
             "ws" => stream,
             "wss" => {
                 stream
-                    .into_tls(&parsed_addr.host, &self.tls_builder)
+                    // .into_tls(&parsed_addr.host, &self.tls_builder)
+                    .into_tls(&parsed_addr.host)
                     .await?
             }
             _ => return Err(WebSocketError::SchemeError),
