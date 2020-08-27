@@ -60,6 +60,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn close() {
+        let mut ws = WebSocket::connect("wss://echo.websocket.org")
+            .await
+            .unwrap();
+        let status_code = ws
+            .close(Some((1000, String::new())))
+            .await
+            .unwrap()
+            .as_close()
+            .unwrap()
+            .0;
+        assert_eq!(status_code, 1000);
+    }
+
+    #[tokio::test]
     async fn bad_scheme() {
         let resp = WebSocket::connect("http://echo.websocket.org").await;
         if let Ok(_) = resp {

@@ -107,13 +107,15 @@ impl WebSocket {
         .await
     }
 
-    pub async fn close(&mut self, payload: Option<(u16, String)>) -> Result<(), WebSocketError> {
+    pub async fn close(&mut self, payload: Option<(u16, String)>) -> Result<Frame, WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.5.1
         if self.shutdown {
             Err(WebSocketError::WebSocketClosedError)
         } else {
             self.send(Frame::Close { payload }).await?;
-            self.shutdown().await
+            let resp = self.receive().await?;
+            self.shutdown().await?;
+            Ok(resp)
         }
     }
 

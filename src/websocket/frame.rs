@@ -208,6 +208,7 @@ impl Frame {
         raw_frame.append(&mut masking_key);
 
         raw_frame.append(&mut payload);
+
         ws.stream
             .write_all(&raw_frame)
             .await
@@ -258,9 +259,9 @@ impl Frame {
         match self {
             Self::Text { fin, .. } => (*fin as u8) << 7,
             Self::Binary { fin, .. } => (*fin as u8) << 7,
-            Self::Close { .. } => 0,
-            Self::Ping { .. } => 0,
-            Self::Pong { .. } => 0,
+            Self::Close { .. } => 0b10000000,
+            Self::Ping { .. } => 0b10000000,
+            Self::Pong { .. } => 0b10000000,
         }
     }
 
