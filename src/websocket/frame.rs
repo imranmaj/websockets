@@ -16,34 +16,70 @@ const U64_MAX_MINUS_ONE: usize = (u64::MAX - 1) as usize;
 static RNG_CELL: OnceCell<Mutex<ChaCha20Rng>> = OnceCell::new();
 
 // https://tools.ietf.org/html/rfc6455#section-5.2
+/// Data which is sent and received through the WebSocket connection.
+/// 
+/// # Sending
+/// 
+/// To send a [`Frame`], you can construct it normally and use the [`WebSocket::send()`] method, 
+/// or use the convenience methods for each frame type 
+/// ([`send_text()`](WebSocket::send_text()), [`send_binary()`](WebSocket::send_binary()), 
+/// [`close()`](WebSocket::close()), [`send_ping()`](WebSocket::send_ping()), 
+/// and [`send_pong()`](WebSocket::send_pong())).
+/// 
+/// # Receiving
+/// 
+/// [`Frame`]s can be received through the [`WebSocket::receive()`] method.
+/// To extract the underlying data from a received `Frame`, 
+/// you can use the convenience methods [`as_text()`](Frame::as_text()),
+/// [`as_binary()`](Frame::as_binary()), [`as_close()`](Frame::as_close()),
+/// [`as_ping()`](Frame::as_ping()), and [`as_pong()`](Frame::as_pong()).
+/// (and their `mut` counterparts), or simply `match`.
 #[derive(Debug)]
 pub enum Frame {
+    /// A Text frame
     Text {
+        /// The payload for the Text frame
         payload: String,
+        /// Whether the Text frame is a continuation frame in the message
         continuation: bool,
+        /// Whether the Text frame is the final frame in the message
         fin: bool,
     },
+    /// A Binary frame
     Binary {
+        /// The payload for the Binary frame
         payload: Vec<u8>,
+        /// Whether the Binary frame is a continuation frame in the message
         continuation: bool,
+        /// Whether the Binary frame is the final frame in the message
         fin: bool,
     },
+    /// A Close frame
     Close {
+        /// The payload for the Close frame
         payload: Option<(u16, String)>,
     },
+    /// A Ping frame
     Ping {
+        /// The payload for the Ping frame
         payload: Option<Vec<u8>>,
     },
+    /// A Pong frame
     Pong {
+        /// The payload for the Pong frame
         payload: Option<Vec<u8>>,
     },
 }
 
 impl Frame {
+    /// Returns whether the frame is a Text frame.
     pub fn is_text(&self) -> bool {
         self.as_text().is_some()
     }
 
+    /// Attempts to interpret the frame as a Text frame,
+    /// returning a reference to the underlying data if it is, 
+    /// and None otherwise.
     pub fn as_text(&self) -> Option<(&String, &bool, &bool)> {
         match self {
             Self::Text {
@@ -54,7 +90,9 @@ impl Frame {
             _ => None,
         }
     }
-
+    /// Attempts to interpret the frame as a Text frame,
+    /// returning a mutable reference to the underlying data if it is, 
+    /// and None otherwise.
     pub fn as_text_mut(&mut self) -> Option<(&mut String, &mut bool, &mut bool)> {
         match self {
             Self::Text {
@@ -66,10 +104,14 @@ impl Frame {
         }
     }
 
+    /// Returns whether the frame is a Binary frame.
     pub fn is_binary(&self) -> bool {
         self.as_binary().is_some()
     }
 
+    /// Attempts to interpret the frame as a Binary frame,
+    /// returning a reference to the underlying data if it is, 
+    /// and None otherwise.
     pub fn as_binary(&self) -> Option<(&Vec<u8>, &bool, &bool)> {
         match self {
             Self::Binary {
@@ -81,6 +123,9 @@ impl Frame {
         }
     }
 
+    /// Attempts to interpret the frame as a Binary frame,
+    /// returning a mutable reference to the underlying data if it is, 
+    /// and None otherwise.
     pub fn as_binary_mut(&mut self) -> Option<(&mut Vec<u8>, &mut bool, &mut bool)> {
         match self {
             Self::Binary {
@@ -92,10 +137,14 @@ impl Frame {
         }
     }
 
+    /// Returns whether the frame is a Close frame.
     pub fn is_close(&self) -> bool {
         self.as_close().is_some()
     }
 
+    /// Attempts to interpret the frame as a Close frame,
+    /// returning a reference to the underlying data if it is, 
+    /// and None otherwise.
     pub fn as_close(&self) -> Option<&(u16, String)> {
         match self {
             Self::Close { payload } => payload.as_ref(),
@@ -103,6 +152,9 @@ impl Frame {
         }
     }
 
+    /// Attempts to interpret the frame as a Close frame,
+    /// returning a mutable reference to the underlying data if it is, 
+    /// and None otherwise.
     pub fn as_close_mut(&mut self) -> Option<&mut (u16, String)> {
         match self {
             Self::Close { payload } => payload.as_mut(),
@@ -110,10 +162,14 @@ impl Frame {
         }
     }
 
+    /// Returns whether the frame is a Ping frame.
     pub fn is_ping(&self) -> bool {
         self.as_ping().is_some()
     }
 
+    /// Attempts to interpret the frame as a Ping frame,
+    /// returning a reference to the underlying data if it is, 
+    /// and None otherwise.
     pub fn as_ping(&self) -> Option<&Vec<u8>> {
         match self {
             Self::Ping { payload } => payload.as_ref(),
@@ -121,6 +177,9 @@ impl Frame {
         }
     }
 
+    /// Attempts to interpret the frame as a Ping frame,
+    /// returning a mutable reference to the underlying data if it is, 
+    /// and None otherwise.
     pub fn as_ping_mut(&mut self) -> Option<&mut Vec<u8>> {
         match self {
             Self::Ping { payload } => payload.as_mut(),
@@ -128,10 +187,14 @@ impl Frame {
         }
     }
 
+    /// Returns whether the frame is a Pong frame.
     pub fn is_pong(&self) -> bool {
         self.as_pong().is_some()
     }
 
+    /// Attempts to interpret the frame as a Pong frame,
+    /// returning a reference to the underlying data if it is, 
+    /// and None otherwise.
     pub fn as_pong(&self) -> Option<&Vec<u8>> {
         match self {
             Self::Pong { payload } => payload.as_ref(),
@@ -139,6 +202,9 @@ impl Frame {
         }
     }
 
+    /// Attempts to interpret the frame as a Pong frame,
+    /// returning a mutable reference to the underlying data if it is, 
+    /// and None otherwise.
     pub fn as_pong_mut(&mut self) -> Option<&mut Vec<u8>> {
         match self {
             Self::Pong { payload } => payload.as_mut(),
@@ -335,7 +401,7 @@ impl Frame {
             }),
             // reserved range
             0x3..=0x7 => Err(WebSocketError::InvalidFrameError),
-            0x8 if payload.len() == 0 => Ok(Self::Close { payload: None }),
+            0x8 if payload_len == 0 => Ok(Self::Close { payload: None }),
             // if there is a payload it must have a u16 status code
             0x8 if payload_len < 2 => Err(WebSocketError::InvalidFrameError),
             0x8 => {
