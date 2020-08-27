@@ -83,16 +83,8 @@ impl Handshake {
     pub(super) async fn check_response(&self, ws: &mut WebSocket) -> Result<(), WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-1.3
         // https://tools.ietf.org/html/rfc6455#section-4.2.2
-        // sec-websocket-accept
-        // sec-websocket-version
-        // sec-websocket-protocol
         let status_line_regex = Regex::new(r"HTTP/\d+\.\d+ (?P<status_code>\d{3}) .+\r\n").unwrap();
         let mut status_line = String::new();
-
-        // use tokio::io::AsyncReadExt;
-        // let mut  x = vec![0; 16];
-        // ws.stream.read(&mut x);
-        // println!("{:?}", x);
 
         ws.stream
             .read_line(&mut status_line)
@@ -219,20 +211,5 @@ impl Handshake {
 
         ws.handshake_response_headers = Some(headers);
         Ok(())
-
-        // if status_code != "101" {
-        //     return Err(WebSocketError::HandshakeFailed {
-        //         status_code: status_code.to_string(),
-
-        //     });
-        // }
-
-        // match status_code {
-        //     "101" => unimplemented!(), // check key
-
-        // }
-        // set accepted subprotocols
-        // set handshake response headers
-        // unimplemented!()
     }
 }

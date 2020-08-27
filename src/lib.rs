@@ -1,4 +1,4 @@
-#![forbid(unsafe_code)]
+#![forbid(unsafe_code, missing_debug_implementations)]
 
 mod error;
 mod websocket;
@@ -6,7 +6,6 @@ mod websocket;
 pub use error::WebSocketError;
 pub use websocket::frame::Frame;
 pub use websocket::WebSocket;
-// pub use websocket::builder::{Certificate, Identity, Protocol};
 
 #[cfg(test)]
 mod tests {

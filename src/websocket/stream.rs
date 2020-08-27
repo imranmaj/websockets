@@ -1,4 +1,3 @@
-// use native_tls::TlsConnectorBuilder;
 use native_tls::TlsConnector as NativeTlsTlsConnector;
 use std::io::Error as IoError;
 use std::pin::Pin;

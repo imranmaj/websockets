@@ -49,11 +49,6 @@ impl WebSocket {
             return Err(WebSocketError::WebSocketClosedError);
         }
         frame.send(self).await?;
-        // let raw_frame = frame.into_raw()?;
-        // self.stream
-        //     .write_all(&raw_frame)
-        //     .await
-        //     .map_err(|e| WebSocketError::WriteError(e))?;
         Ok(())
     }
 

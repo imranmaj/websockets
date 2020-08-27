@@ -15,6 +15,7 @@ const U64_MAX_MINUS_ONE: usize = (u64::MAX - 1) as usize;
 static RNG_CELL: OnceCell<Mutex<ChaCha20Rng>> = OnceCell::new();
 
 // https://tools.ietf.org/html/rfc6455#section-5.2
+#[derive(Debug)]
 pub enum Frame {
     Text {
         payload: String,
