@@ -72,7 +72,7 @@ impl WebSocket {
                 };
                 self.send(pong).await?;
             }
-            // echo close frame and close (https://tools.ietf.org/html/rfc6455#section-1.4)
+            // echo close frame and shutdown (https://tools.ietf.org/html/rfc6455#section-1.4)
             Frame::Close { payload } => {
                 let close = Frame::Close {
                     payload: payload
@@ -80,25 +80,64 @@ impl WebSocket {
                         .map(|(status_code, _reason)| (status_code.clone(), String::new())),
                 };
                 self.send(close).await?;
-                self.close().await?;
+                self.shutdown().await?;
             }
             _ => (),
         }
         Ok(frame)
     }
 
-    pub async fn close(&mut self) -> Result<(), WebSocketError> {
+    pub async fn text(
+        &mut self,
+        payload: String,
+        continuation: bool,
+        fin: bool,
+    ) -> Result<(), WebSocketError> {
+        self.send(Frame::Text {
+            payload,
+            continuation,
+            fin,
+        })
+        .await
+    }
+
+    pub async fn binary(
+        &mut self,
+        payload: Vec<u8>,
+        continuation: bool,
+        fin: bool,
+    ) -> Result<(), WebSocketError> {
+        self.send(Frame::Binary {
+            payload,
+            continuation,
+            fin,
+        })
+        .await
+    }
+
+    pub async fn close(&mut self, payload: Option<(u16, String)>) -> Result<(), WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.5.1
         if self.shutdown {
             Err(WebSocketError::WebSocketClosedError)
         } else {
-            self.send(Frame::Close { payload: None }).await?;
-            self.shutdown = true;
-            self.stream
-                .shutdown()
-                .await
-                .map_err(|e| WebSocketError::ShutdownError(e))?;
-            Ok(())
+            self.send(Frame::Close { payload }).await?;
+            self.shutdown().await
         }
+    }
+
+    pub async fn ping(&mut self, payload: Option<Vec<u8>>) -> Result<(), WebSocketError> {
+        self.send(Frame::Ping { payload }).await
+    }
+
+    pub async fn pong(&mut self, payload: Option<Vec<u8>>) -> Result<(), WebSocketError> {
+        self.send(Frame::Pong { payload }).await
+    }
+
+    pub async fn shutdown(&mut self) -> Result<(), WebSocketError> {
+        self.shutdown = true;
+        self.stream
+            .shutdown()
+            .await
+            .map_err(|e| WebSocketError::ShutdownError(e))
     }
 }
