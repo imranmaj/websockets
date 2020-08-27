@@ -1,15 +1,14 @@
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
-
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 use regex::Regex;
+use sha1::{Digest, Sha1};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 
 use super::parsed_addr::ParsedAddr;
 use super::WebSocket;
 use crate::error::WebSocketError;
 
-// length of "HTTP/1.1 101 Switching Protocols"
-const PROBABLE_STATUS_LINE_LENGTH: usize = 34;
+const GUUID: &'static str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 #[derive(Debug)]
 pub(super) struct Handshake {
@@ -47,14 +46,17 @@ impl Handshake {
         // https://tools.ietf.org/html/rfc6455#section-1.3
         // https://tools.ietf.org/html/rfc6455#section-4.1
         let mut headers = Vec::new();
-        headers.push(("Host".into(), self.host.clone()));
-        headers.push(("Upgrade".into(), "websocket".into()));
-        headers.push(("Connection".into(), "Upgrade".into()));
-        headers.push(("Sec-WebSocket-Key".into(), self.key.clone()));
-        headers.push(("Sec-Websocket-Version".into(), self.version.to_string()));
+        headers.push(("Host".to_string(), self.host.clone()));
+        headers.push(("Upgrade".to_string(), "websocket".to_string()));
+        headers.push(("Connection".to_string(), "Upgrade".to_string()));
+        headers.push(("Sec-WebSocket-Key".to_string(), self.key.clone()));
+        headers.push((
+            "Sec-Websocket-Version".to_string(),
+            self.version.to_string(),
+        ));
         if self.subprotocols.len() > 0 {
             headers.push((
-                "Sec-WebSocket-Protocol".into(),
+                "Sec-WebSocket-Protocol".to_string(),
                 self.subprotocols.join(", "),
             ));
         }
@@ -71,6 +73,10 @@ impl Handshake {
             .write_all(req.as_bytes())
             .await
             .map_err(|e| WebSocketError::WriteError(e))?;
+        ws.stream
+            .flush()
+            .await
+            .map_err(|e| WebSocketError::WriteError(e))?;
         Ok(())
     }
 
@@ -80,19 +86,153 @@ impl Handshake {
         // sec-websocket-accept
         // sec-websocket-version
         // sec-websocket-protocol
-        let status_line_regex = Regex::new(r"HTTP/\d+\.\d+ (\d{3}) (.+)\r\n").unwrap();
-        let mut status_line = String::with_capacity(PROBABLE_STATUS_LINE_LENGTH);
+        let status_line_regex = Regex::new(r"HTTP/\d+\.\d+ (?P<status_code>\d{3}) .+\r\n").unwrap();
+        let mut status_line = String::new();
+
+        // use tokio::io::AsyncReadExt;
+        // let mut  x = vec![0; 16];
+        // ws.stream.read(&mut x);
+        // println!("{:?}", x);
+
         ws.stream
             .read_line(&mut status_line)
             .await
             .map_err(|e| WebSocketError::ReadError(e))?;
-        let captures = status_line_regex.captures(&status_line).ok_or(WebSocketError::InvalidHandshakeError)?;
-        let status_code = &captures[1];
-        // let reason_phrase = captures.get(2).ok_or(WebSocketError::InvalidHandshakeError);
-        
-        println!("{}", status_code);
+        let captures = status_line_regex
+            .captures(&status_line)
+            .ok_or(WebSocketError::InvalidHandshakeError)?;
+        let status_code = &captures["status_code"];
+
+        let mut headers = Vec::new();
+        let headers_regex = Regex::new(r"(?P<field>.+?):\s*(?P<value>.*?)\s*\r\n").unwrap();
+        loop {
+            let mut header = String::new();
+            ws.stream
+                .read_line(&mut header)
+                .await
+                .map_err(|e| WebSocketError::ReadError(e))?;
+            match headers_regex.captures(&header) {
+                Some(captures) => {
+                    let field = &captures["field"];
+                    let value = &captures["value"];
+                    headers.push((field.to_string(), value.to_string()));
+                }
+                None => break, // field is empty, so the header is finished (we got double crlf)
+            }
+        }
+
+        // check status code
+        if status_code != "101" {
+            let body = match headers
+                .iter()
+                .find(|(field, _value)| field.to_lowercase() == "content-length")
+            {
+                Some(header) => {
+                    let body_length = header
+                        .1
+                        .parse::<usize>()
+                        .map_err(|_e| WebSocketError::InvalidHandshakeError)?;
+                    let mut body = vec![0; body_length];
+                    ws.stream
+                        .read_exact(&mut body)
+                        .await
+                        .map_err(|e| WebSocketError::ReadError(e))?;
+                    Some(
+                        String::from_utf8(body)
+                            .map_err(|_e| WebSocketError::InvalidHandshakeError)?,
+                    )
+                }
+                None => None,
+            };
+            return Err(WebSocketError::HandshakeFailedError {
+                status_code: status_code.to_string(),
+                headers,
+                body,
+            });
+        }
+
+        // check upgrade field
+        let upgrade = headers
+            .iter()
+            .find(|(field, _value)| field.to_lowercase() == "upgrade")
+            .ok_or(WebSocketError::InvalidHandshakeError)?
+            .1
+            .clone();
+        if upgrade.to_lowercase() != "websocket" {
+            return Err(WebSocketError::InvalidHandshakeError);
+        }
+
+        // check connection field
+        let connection = headers
+            .iter()
+            .find(|(field, _value)| field.to_lowercase() == "connection")
+            .ok_or(WebSocketError::InvalidHandshakeError)?
+            .1
+            .clone();
+        if connection.to_lowercase() != "upgrade" {
+            return Err(WebSocketError::InvalidHandshakeError);
+        }
+
+        // check extensions
+        if let Some(_) = headers
+            .iter()
+            .find(|(field, _value)| field.to_lowercase() == "sec-websocket-extensions")
+        {
+            // extensions not supported
+            return Err(WebSocketError::InvalidHandshakeError);
+        }
+
+        // check subprotocols
+        let possible_subprotocol = headers
+            .iter()
+            .find(|(field, _value)| field.to_lowercase() == "sec-websocket-protocol")
+            .map(|(_field, value)| value.clone());
+        match (possible_subprotocol, self.subprotocols.len()) {
+            // server accepted a subprotocol that was not specified
+            (Some(_), 0) => return Err(WebSocketError::InvalidHandshakeError),
+            // server accepted a subprotocol that may have been specified
+            (Some(subprotocol), _) => {
+                if self.subprotocols.contains(&subprotocol) {
+                    ws.accepted_subprotocol = Some(subprotocol)
+                } else {
+                    return Err(WebSocketError::InvalidHandshakeError);
+                }
+            }
+            // server did not accept a subprotocol, whether one was specified or not
+            (None, _) => (),
+        }
+
+        // validate key
+        let accept_key = headers
+            .iter()
+            .find(|(field, _value)| field.to_lowercase() == "sec-websocket-accept")
+            .ok_or(WebSocketError::InvalidHandshakeError)?
+            .1
+            .clone();
+        let mut test_key = self.key.clone();
+        test_key.push_str(GUUID);
+        let hashed: [u8; 20] = Sha1::digest(test_key.as_bytes()).into();
+        let calculated_accept_key = base64::encode(hashed);
+        if accept_key != calculated_accept_key {
+            return Err(WebSocketError::InvalidHandshakeError);
+        }
+
+        ws.handshake_response_headers = Some(headers);
+        Ok(())
+
+        // if status_code != "101" {
+        //     return Err(WebSocketError::HandshakeFailed {
+        //         status_code: status_code.to_string(),
+
+        //     });
+        // }
+
+        // match status_code {
+        //     "101" => unimplemented!(), // check key
+
+        // }
         // set accepted subprotocols
         // set handshake response headers
-        unimplemented!()
+        // unimplemented!()
     }
 }

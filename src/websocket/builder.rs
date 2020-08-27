@@ -41,7 +41,7 @@ impl WebSocketBuilder {
 
     pub fn add_header(&mut self, header_name: &str, header_value: &str) -> &mut Self {
         self.additional_handshake_headers
-            .push((header_name.into(), header_value.into()));
+            .push((header_name.to_string(), header_value.to_string()));
         self
     }
 
@@ -52,7 +52,7 @@ impl WebSocketBuilder {
     }
 
     pub fn add_subprotocol(&mut self, subprotocol: &str) -> &mut Self {
-        self.subprotocols.push(subprotocol.into());
+        self.subprotocols.push(subprotocol.to_string());
         self
     }
 
@@ -127,7 +127,7 @@ impl WebSocketBuilder {
                 .await
                 .map_err(|e| WebSocketError::TcpConnectionError(e))?,
         );
-        let stream = match &*parsed_addr.scheme {
+        let stream = match &parsed_addr.scheme[..] {
             "ws" => stream,
             "wss" => {
                 stream
@@ -139,9 +139,9 @@ impl WebSocketBuilder {
         };
         let mut ws = WebSocket {
             stream: BufStream::new(stream),
-            closed: false,
+            shutdown: false,
             last_frame_type: FrameType::Control,
-            accepted_subprotocols: None,
+            accepted_subprotocol: None,
             handshake_response_headers: None,
         };
 

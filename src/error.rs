@@ -27,12 +27,14 @@ pub enum WebSocketError {
     ShutdownError(IoError),
 
     // handshake errors
-    #[error("invalid handshake accept key from server")]
-    KeyError,
     #[error("invalid handshake response")]
     InvalidHandshakeError,
-    #[error("failed handhshake")]
-    HandhshakeFailed,
+    #[error("failed handshake")]
+    HandshakeFailedError {
+        status_code: String,
+        headers: Vec<(String, String)>,
+        body: Option<String>,
+    },
 
     // frame errors
     #[error("control frame has payload larger than 125 bytes")]

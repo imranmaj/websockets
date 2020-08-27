@@ -13,6 +13,7 @@ once_cell        = "1.4.1"
 rand             = "0.7.3"
 rand_chacha      = "0.2.2"
 regex            = "1.3.9"
+sha-1            = "0.9.1"
 thiserror        = "1.0.20"
 tokio            = { version = "0.2.21", features = ["tcp", "io-util"] }
 tokio-native-tls = "0.1.0"

@@ -38,7 +38,7 @@ pub enum Frame {
 }
 
 impl Frame {
-    pub(super) async fn send(self, ws: &mut WebSocket) -> Result<Vec<u8>, WebSocketError> {
+    pub(super) async fn send(self, ws: &mut WebSocket) -> Result<(), WebSocketError> {
         // calculate before moving payload out of self
         let is_control = self.is_control();
         let opcode = self.opcode();
@@ -104,7 +104,11 @@ impl Frame {
             .write_all(&raw_frame)
             .await
             .map_err(|e| WebSocketError::WriteError(e))?;
-        Ok(raw_frame)
+        ws.stream
+            .flush()
+            .await
+            .map_err(|e| WebSocketError::WriteError(e))?;
+        Ok(())
     }
 
     fn is_control(&self) -> bool {

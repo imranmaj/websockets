@@ -30,9 +30,9 @@ impl TryFrom<&str> for ParsedAddr {
             .next()
             .ok_or(WebSocketError::ResolutionError)?;
         Ok(ParsedAddr {
-            scheme: scheme.into(),
-            host: host.into(),
-            path: path.into(),
+            scheme: scheme.to_string(),
+            host: host.to_string(),
+            path: path.to_string(),
             addr,
         })
     }

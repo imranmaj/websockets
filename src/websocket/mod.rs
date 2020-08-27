@@ -21,9 +21,9 @@ enum FrameType {
 #[derive(Debug)]
 pub struct WebSocket {
     stream: BufStream<Stream>,
-    closed: bool,
+    shutdown: bool,
     last_frame_type: FrameType,
-    accepted_subprotocols: Option<Vec<String>>,
+    accepted_subprotocol: Option<String>,
     handshake_response_headers: Option<Vec<(String, String)>>,
 }
 
@@ -36,12 +36,16 @@ impl WebSocket {
         WebSocketBuilder::new().connect(url).await
     }
 
-    pub fn accepted_subprotocols(&self) -> &Option<Vec<String>> {
-        &self.accepted_subprotocols
+    pub fn accepted_subprotocol(&self) -> &Option<String> {
+        &self.accepted_subprotocol
+    }
+
+    pub fn handshake_response_headers(&self) -> &Option<Vec<(String, String)>> {
+        &self.handshake_response_headers
     }
 
     pub async fn send(&mut self, frame: Frame) -> Result<(), WebSocketError> {
-        if self.closed {
+        if self.shutdown {
             return Err(WebSocketError::WebSocketClosedError);
         }
         frame.send(self).await?;
@@ -54,7 +58,7 @@ impl WebSocket {
     }
 
     pub async fn receive(&mut self) -> Result<Frame, WebSocketError> {
-        if self.closed {
+        if self.shutdown {
             return Err(WebSocketError::WebSocketClosedError);
         }
         let frame = Frame::read_from_websocket(self).await?;
@@ -90,11 +94,11 @@ impl WebSocket {
 
     pub async fn close(&mut self) -> Result<(), WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.5.1
-        if self.closed {
+        if self.shutdown {
             Err(WebSocketError::WebSocketClosedError)
         } else {
             self.send(Frame::Close { payload: None }).await?;
-            self.closed = true;
+            self.shutdown = true;
             self.stream
                 .shutdown()
                 .await
