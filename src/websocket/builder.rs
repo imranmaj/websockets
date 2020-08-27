@@ -25,23 +25,27 @@ impl WebSocketBuilder {
     }
 
     pub fn add_header(&mut self, header_name: &str, header_value: &str) -> &mut Self {
+        // https://tools.ietf.org/html/rfc6455#section-4.2.2
         self.additional_handshake_headers
             .push((header_name.to_string(), header_value.to_string()));
         self
     }
 
     pub fn remove_header(&mut self, header_name: &str) -> &mut Self {
+        // https://tools.ietf.org/html/rfc6455#section-4.2.2
         self.additional_handshake_headers
             .retain(|header| header.0 != header_name);
         self
     }
 
     pub fn add_subprotocol(&mut self, subprotocol: &str) -> &mut Self {
+        // https://tools.ietf.org/html/rfc6455#section-1.9
         self.subprotocols.push(subprotocol.to_string());
         self
     }
 
     pub fn remove_subprotocol(&mut self, subprotocol: &str) -> &mut Self {
+        // https://tools.ietf.org/html/rfc6455#section-1.9
         self.subprotocols.retain(|s| s != subprotocol);
         self
     }
@@ -55,7 +59,9 @@ impl WebSocketBuilder {
                 .map_err(|e| WebSocketError::TcpConnectionError(e))?,
         );
         let stream = match &parsed_addr.scheme[..] {
+            // https://tools.ietf.org/html/rfc6455#section-11.1.1
             "ws" => stream,
+            // https://tools.ietf.org/html/rfc6455#section-11.1.2
             "wss" => {
                 stream
                     .into_tls(&parsed_addr.host)

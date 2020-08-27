@@ -49,7 +49,7 @@ impl WebSocket {
             return Err(WebSocketError::WebSocketClosedError);
         }
         let frame = Frame::read_from_websocket(self).await?;
-        // remember last data frame type in case we get continuation frames
+        // remember last data frame type in case we get continuation frames (https://tools.ietf.org/html/rfc6455#section-5.2)
         match frame {
             Frame::Text { .. } => self.last_frame_type = FrameType::Text,
             Frame::Binary { .. } => self.last_frame_type = FrameType::Binary,
@@ -57,7 +57,7 @@ impl WebSocket {
         };
         // handle incoming frames
         match &frame {
-            // echo ping frame
+            // echo ping frame (https://tools.ietf.org/html/rfc6455#section-5.5.2)
             Frame::Ping { payload } => {
                 let pong = Frame::Pong {
                     payload: payload.clone(),
@@ -85,6 +85,7 @@ impl WebSocket {
         continuation: bool,
         fin: bool,
     ) -> Result<(), WebSocketError> {
+        // https://tools.ietf.org/html/rfc6455#section-5.6
         self.send(Frame::Text {
             payload,
             continuation,
@@ -99,6 +100,7 @@ impl WebSocket {
         continuation: bool,
         fin: bool,
     ) -> Result<(), WebSocketError> {
+        // https://tools.ietf.org/html/rfc6455#section-5.6
         self.send(Frame::Binary {
             payload,
             continuation,
@@ -120,10 +122,12 @@ impl WebSocket {
     }
 
     pub async fn send_ping(&mut self, payload: Option<Vec<u8>>) -> Result<(), WebSocketError> {
+        // https://tools.ietf.org/html/rfc6455#section-5.5.2
         self.send(Frame::Ping { payload }).await
     }
 
     pub async fn send_pong(&mut self, payload: Option<Vec<u8>>) -> Result<(), WebSocketError> {
+        // https://tools.ietf.org/html/rfc6455#section-5.5.3
         self.send(Frame::Pong { payload }).await
     }
 
@@ -136,10 +140,12 @@ impl WebSocket {
     }
 
     pub fn accepted_subprotocol(&self) -> &Option<String> {
+        // https://tools.ietf.org/html/rfc6455#section-1.9
         &self.accepted_subprotocol
     }
 
     pub fn handshake_response_headers(&self) -> &Option<Vec<(String, String)>> {
+        // https://tools.ietf.org/html/rfc6455#section-4.2.2
         &self.handshake_response_headers
     }
 }
