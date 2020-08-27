@@ -36,14 +36,6 @@ impl WebSocket {
         WebSocketBuilder::new().connect(url).await
     }
 
-    pub fn accepted_subprotocol(&self) -> &Option<String> {
-        &self.accepted_subprotocol
-    }
-
-    pub fn handshake_response_headers(&self) -> &Option<Vec<(String, String)>> {
-        &self.handshake_response_headers
-    }
-
     pub async fn send(&mut self, frame: Frame) -> Result<(), WebSocketError> {
         if self.shutdown {
             return Err(WebSocketError::WebSocketClosedError);
@@ -87,7 +79,7 @@ impl WebSocket {
         Ok(frame)
     }
 
-    pub async fn text(
+    pub async fn send_text(
         &mut self,
         payload: String,
         continuation: bool,
@@ -101,7 +93,7 @@ impl WebSocket {
         .await
     }
 
-    pub async fn binary(
+    pub async fn send_binary(
         &mut self,
         payload: Vec<u8>,
         continuation: bool,
@@ -125,11 +117,11 @@ impl WebSocket {
         }
     }
 
-    pub async fn ping(&mut self, payload: Option<Vec<u8>>) -> Result<(), WebSocketError> {
+    pub async fn send_ping(&mut self, payload: Option<Vec<u8>>) -> Result<(), WebSocketError> {
         self.send(Frame::Ping { payload }).await
     }
 
-    pub async fn pong(&mut self, payload: Option<Vec<u8>>) -> Result<(), WebSocketError> {
+    pub async fn send_pong(&mut self, payload: Option<Vec<u8>>) -> Result<(), WebSocketError> {
         self.send(Frame::Pong { payload }).await
     }
 
@@ -139,5 +131,13 @@ impl WebSocket {
             .shutdown()
             .await
             .map_err(|e| WebSocketError::ShutdownError(e))
+    }
+
+    pub fn accepted_subprotocol(&self) -> &Option<String> {
+        &self.accepted_subprotocol
+    }
+
+    pub fn handshake_response_headers(&self) -> &Option<Vec<(String, String)>> {
+        &self.handshake_response_headers
     }
 }
