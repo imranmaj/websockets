@@ -10,6 +10,7 @@ use super::{FrameType, WebSocket};
 use crate::error::WebSocketError;
 
 const U16_MAX_MINUS_ONE: usize = (u16::MAX - 1) as usize;
+const U16_MAX: usize = u16::MAX as usize;
 const U64_MAX_MINUS_ONE: usize = (u64::MAX - 1) as usize;
 
 static RNG_CELL: OnceCell<Mutex<ChaCha20Rng>> = OnceCell::new();
@@ -71,17 +72,16 @@ impl Frame {
         // set payload len: https://tools.ietf.org/html/rfc6455#section-5.2
         let mut raw_frame = Vec::with_capacity(payload.len() + 14);
         raw_frame.push(opcode + fin);
-        let mut payload_len = payload.len().to_be_bytes().to_vec();
         let mut payload_len_data = match payload.len() {
-            0..=125 => payload_len,
+            0..=125 => (payload.len() as u8).to_be_bytes().to_vec(),
             126..=U16_MAX_MINUS_ONE => {
                 let mut payload_len_data = vec![126];
-                payload_len_data.append(&mut payload_len);
+                payload_len_data.extend_from_slice(&(payload.len() as u16).to_be_bytes());
                 payload_len_data
             }
-            U16_MAX_MINUS_ONE..=U64_MAX_MINUS_ONE => {
+            U16_MAX..=U64_MAX_MINUS_ONE => {
                 let mut payload_len_data = vec![127];
-                payload_len_data.append(&mut payload_len);
+                payload_len_data.extend_from_slice(&(payload.len() as u64).to_be_bytes());
                 payload_len_data
             }
             _ => return Err(WebSocketError::PayloadTooLargeError),
