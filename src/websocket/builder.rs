@@ -76,9 +76,14 @@ impl WebSocketBuilder {
             &parsed_addr,
             &self.additional_handshake_headers,
             &self.subprotocols,
-        )?;
+        );
         handshake.send_request(&mut ws).await?;
-        handshake.check_response(&mut ws).await?;
-        Ok(ws)
+        match handshake.check_response(&mut ws).await {
+            Ok(_) => Ok(ws),
+            Err(e) => {
+                ws.shutdown().await?;
+                Err(e)
+            }
+        }
     }
 }

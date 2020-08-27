@@ -25,13 +25,13 @@ impl Handshake {
         parsed_addr: &ParsedAddr,
         additional_handshake_headers: &Vec<(String, String)>,
         subprotocols: &Vec<String>,
-    ) -> Result<Self, WebSocketError> {
+    ) -> Self {
         // https://tools.ietf.org/html/rfc6455#section-5.3
         let mut rand_bytes = vec![0; 16];
         let mut rng = ChaCha20Rng::from_entropy();
         rng.fill_bytes(&mut rand_bytes);
         let key = base64::encode(rand_bytes);
-        Ok(Self {
+        Self {
             path: parsed_addr.path.clone(),
             host: parsed_addr.host.clone(),
             key,
@@ -39,7 +39,7 @@ impl Handshake {
             version: 13,
             additional_headers: additional_handshake_headers.clone(),
             subprotocols: subprotocols.clone(),
-        })
+        }
     }
 
     pub(super) async fn send_request(&self, ws: &mut WebSocket) -> Result<(), WebSocketError> {
