@@ -40,6 +40,112 @@ pub enum Frame {
 }
 
 impl Frame {
+    pub fn is_text(&self) -> bool {
+        self.as_text().is_some()
+    }
+
+    pub fn as_text(&self) -> Option<(&String, &bool, &bool)> {
+        match self {
+            Self::Text {
+                payload,
+                continuation,
+                fin,
+            } => Some((payload, continuation, fin)),
+            _ => None,
+        }
+    }
+
+    pub fn as_text_mut(&mut self) -> Option<(&mut String, &mut bool, &mut bool)> {
+        match self {
+            Self::Text {
+                payload,
+                continuation,
+                fin,
+            } => Some((payload, continuation, fin)),
+            _ => None,
+        }
+    }
+
+    pub fn is_binary(&self) -> bool {
+        self.as_binary().is_some()
+    }
+
+    pub fn as_binary(&self) -> Option<(&Vec<u8>, &bool, &bool)> {
+        match self {
+            Self::Binary {
+                payload,
+                continuation,
+                fin,
+            } => Some((payload, continuation, fin)),
+            _ => None,
+        }
+    }
+
+    pub fn as_binary_mut(&mut self) -> Option<(&mut Vec<u8>, &mut bool, &mut bool)> {
+        match self {
+            Self::Binary {
+                payload,
+                continuation,
+                fin,
+            } => Some((payload, continuation, fin)),
+            _ => None,
+        }
+    }
+
+    pub fn is_close(&self) -> bool {
+        self.as_close().is_some()
+    }
+
+    pub fn as_close(&self) -> Option<&(u16, String)> {
+        match self {
+            Self::Close { payload } => payload.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn as_close_mut(&mut self) -> Option<&mut (u16, String)> {
+        match self {
+            Self::Close { payload } => payload.as_mut(),
+            _ => None,
+        }
+    }
+
+    pub fn is_ping(&self) -> bool {
+        self.as_ping().is_some()
+    }
+
+    pub fn as_ping(&self) -> Option<&Vec<u8>> {
+        match self {
+            Self::Ping { payload } => payload.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn as_ping_mut(&mut self) -> Option<&mut Vec<u8>> {
+        match self {
+            Self::Ping { payload } => payload.as_mut(),
+            _ => None,
+        }
+    }
+
+    pub fn is_pong(&self) -> bool {
+        self.as_pong().is_some()
+    }
+
+    pub fn as_pong(&self) -> Option<&Vec<u8>> {
+        match self {
+            Self::Pong { payload } => payload.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn as_pong_mut(&mut self) -> Option<&mut Vec<u8>> {
+        match self {
+            Self::Pong { payload } => payload.as_mut(),
+            _ => None,
+        }
+    }
+
     pub(super) async fn send(self, ws: &mut WebSocket) -> Result<(), WebSocketError> {
         // calculate before moving payload out of self
         let is_control = self.is_control();
