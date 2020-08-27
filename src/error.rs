@@ -18,7 +18,7 @@ pub enum WebSocketError {
     // handshake errors
     #[error("invalid handshake response")]
     InvalidHandshakeError,
-    #[error("failed handshake")]
+    #[error("server rejected handshake")]
     HandshakeFailedError {
         status_code: String,
         headers: Vec<(String, String)>,
