@@ -94,11 +94,12 @@ impl Frame {
             .get_or_init(|| Mutex::new(ChaCha20Rng::from_entropy()))
             .lock()
             .expect("rng mutex poisoned");
-        let mut masking_key = Vec::with_capacity(4);
+        let mut masking_key = vec![0; 4];
         rng.fill_bytes(&mut masking_key);
         for (i, byte) in payload.iter_mut().enumerate() {
             *byte = *byte ^ (masking_key[i % 4]);
         }
+        raw_frame.append(&mut masking_key);
 
         raw_frame.append(&mut payload);
         ws.stream
