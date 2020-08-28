@@ -14,4 +14,4 @@ See the `WebSocket` type for examples on how to use it.
 
 Data is sent and received through `Frame`s. If you have a constructed frame you would like to send, you can use the `WebSocket::send()` method; however, there are also convenience methods for each frame type (`send_text()`, `send_binary()`, `close()`, `send_ping()`, and `send_pong()`).
 
-If you have received a `Frame` from which you would like to extract the data, you can use the convenience methods `as_text()`, `as_binary()`, `as_close()`, `as_ping()`, and `as_pong()`. (and their `mut` counterparts), or simply `match`.
+If you have received a `Frame` from which you would like to extract the data, you can use the convenience methods `as_text()`, `as_binary()`, `as_close()`, `as_ping()`, and `as_pong()` (and their `mut` counterparts), or simply `match`.

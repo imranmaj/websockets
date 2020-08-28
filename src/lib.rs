@@ -23,7 +23,7 @@
 //! If you have received a [`Frame`] from which you would like to extract the data,
 //! you can use the convenience methods [`as_text()`](Frame::as_text()),
 //! [`as_binary()`](Frame::as_binary()), [`as_close()`](Frame::as_close()),
-//! [`as_ping()`](Frame::as_ping()), and [`as_pong()`](Frame::as_pong()).
+//! [`as_ping()`](Frame::as_ping()), and [`as_pong()`](Frame::as_pong())
 //! (and their `mut` counterparts), or simply `match`.
 
 #![forbid(
