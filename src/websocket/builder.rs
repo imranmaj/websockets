@@ -2,6 +2,8 @@ use std::convert::TryFrom;
 
 use tokio::io::BufStream;
 use tokio::net::TcpStream;
+use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
 
 use super::handshake::Handshake;
 use super::parsed_addr::ParsedAddr;
@@ -62,6 +64,7 @@ impl WebSocketBuilder {
         let mut ws = WebSocket {
             stream: BufStream::new(stream),
             shutdown: false,
+            rng: ChaCha20Rng::from_entropy(),
             last_frame_type: FrameType::Control,
             accepted_subprotocol: None,
             handshake_response_headers: None,

@@ -1,9 +1,6 @@
 use std::convert::TryInto;
-use std::sync::Mutex;
 
-use once_cell::sync::OnceCell;
-use rand::{RngCore, SeedableRng};
-use rand_chacha::ChaCha20Rng;
+use rand::RngCore;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use super::{FrameType, WebSocket};
@@ -12,8 +9,6 @@ use crate::error::WebSocketError;
 const U16_MAX_MINUS_ONE: usize = (u16::MAX - 1) as usize;
 const U16_MAX: usize = u16::MAX as usize;
 const U64_MAX_MINUS_ONE: usize = (u64::MAX - 1) as usize;
-
-static RNG_CELL: OnceCell<Mutex<ChaCha20Rng>> = OnceCell::new();
 
 // https://tools.ietf.org/html/rfc6455#section-5.2
 /// Data which is sent and received through the WebSocket connection.
@@ -262,12 +257,8 @@ impl Frame {
         raw_frame.append(&mut payload_len_data);
 
         // payload masking: https://tools.ietf.org/html/rfc6455#section-5.3
-        let mut rng = RNG_CELL
-            .get_or_init(|| Mutex::new(ChaCha20Rng::from_entropy()))
-            .lock()
-            .expect("rng mutex poisoned");
         let mut masking_key = vec![0; 4];
-        rng.fill_bytes(&mut masking_key);
+        ws.rng.fill_bytes(&mut masking_key);
         for (i, byte) in payload.iter_mut().enumerate() {
             *byte = *byte ^ (masking_key[i % 4]);
         }

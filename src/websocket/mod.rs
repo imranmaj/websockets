@@ -6,6 +6,7 @@ mod stream;
 
 use futures::FutureExt;
 use tokio::io::{AsyncWriteExt, BufStream};
+use rand_chacha::ChaCha20Rng;
 
 use crate::error::WebSocketError;
 use builder::WebSocketBuilder;
@@ -99,6 +100,7 @@ enum FrameType {
 pub struct WebSocket {
     stream: BufStream<Stream>,
     shutdown: bool,
+    rng: ChaCha20Rng,
     last_frame_type: FrameType,
     accepted_subprotocol: Option<String>,
     handshake_response_headers: Option<Vec<(String, String)>>,
