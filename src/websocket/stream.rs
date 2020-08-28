@@ -15,7 +15,7 @@ pub(super) enum Stream {
 }
 
 impl Stream {
-    pub async fn into_tls(self, host: &str) -> Result<Self, WebSocketError> {
+    pub(super) async fn into_tls(self, host: &str) -> Result<Self, WebSocketError> {
         match self {
             Self::Plain(tcp_stream) => {
                 let connector: TokioTlsConnector = NativeTlsTlsConnector::new()
@@ -28,6 +28,20 @@ impl Stream {
                 Ok(Stream::Tls(tls_stream))
             }
             Self::Tls(_) => Ok(self),
+        }
+    }
+
+    // pub(super) fn get_ref(&self) -> &TcpStream {
+    //     match self {
+    //         Self::Plain(tcp_stream) => tcp_stream,
+    //         Self::Tls(tls_stream) => tls_stream.get_ref().get_ref().get_ref(),
+    //     }
+    // }
+
+    pub(super) fn get_mut(&mut self) -> &mut TcpStream {
+        match self {
+            Self::Plain(tcp_stream) => tcp_stream,
+            Self::Tls(tls_stream) => tls_stream.get_mut().get_mut().get_mut(),
         }
     }
 }

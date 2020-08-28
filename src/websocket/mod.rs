@@ -4,6 +4,7 @@ mod handshake;
 mod parsed_addr;
 mod stream;
 
+use futures::FutureExt;
 use tokio::io::{AsyncWriteExt, BufStream};
 
 use crate::error::WebSocketError;
@@ -124,11 +125,24 @@ impl WebSocket {
         Ok(())
     }
 
+    /// Checks whether a frame is ready to be received.
+    pub fn ready_to_receive(&mut self) -> Result<bool, WebSocketError> {
+        let tcp_stream = self.stream.get_mut().get_mut();
+        match tcp_stream.peek(&mut vec![0]).now_or_never() {
+            Some(Ok(bytes_read)) => Ok(bytes_read > 0),
+            Some(Err(e)) => Err(WebSocketError::ReadError(e)),
+            None => Ok(false),
+        }
+    }
+
     /// Receives a [`Frame`] over the WebSocket connection.
     ///
     /// If the received frame is a Ping frame, a Pong frame will be sent.
     /// If the received frame is a Close frame, an echoed Close frame
     /// will be sent and the WebSocket will close.
+    /// 
+    /// This method may block until receiving is ready. To check whether
+    /// data is available to be received, use [`ready_to_receive()`](WebSocket::ready_to_receive()).
     pub async fn receive(&mut self) -> Result<Frame, WebSocketError> {
         if self.shutdown {
             return Err(WebSocketError::WebSocketClosedError);
