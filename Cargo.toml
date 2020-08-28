@@ -7,14 +7,14 @@ categories   = [
     "web-programming::websocket",
 ]
 description  = "A WebSocket client implementation."
+documentation = "http://docs.rs/websockets"
 edition      = "2018"
-homepage     = "https://github.com/imranmaj/websockets"
 keywords     = ["websocket", "websockets", "async", "tokio", "io"]
 license      = "MIT"
 name         = "websockets"
 readme       = "README.md"
 repository   = "https://github.com/imranmaj/websockets"
-version      = "0.1.1"
+version      = "0.1.2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
