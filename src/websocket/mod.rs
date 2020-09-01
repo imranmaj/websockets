@@ -25,14 +25,13 @@ enum FrameType {
 /// Connect directly with [`WebSocket::connect()`]...
 ///
 /// ```
-/// use websockets::WebSocket;
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut ws = WebSocket::connect("wss://echo.websocket.org/")
-///         .await
-///         .unwrap();
-/// }
+/// # use websockets::WebSocket;
+/// # #[tokio::main]
+/// # async fn main() {
+/// let mut ws = WebSocket::connect("wss://echo.websocket.org/")
+///     .await
+///     .unwrap();
+/// # }
 /// ```
 ///
 /// ...or customize the handshake using a [`WebSocketBuilder`] obtained from [`WebSocket::builder()`].
