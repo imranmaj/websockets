@@ -18,8 +18,12 @@ async fn main() {
 
 ## Usage
 
-The [`WebSocket`] type manages the WebSocket connection. 
+The `WebSocket` type manages the WebSocket connection. 
 Use it to connect, send, and receive data. 
-Data is sent and received through [`Frame`]s.
+Data is sent and received through `Frame`s.
 
 See these types for additional information on how to use them.
+
+## License
+
+This project is licensed under the MIT license.
