@@ -25,10 +25,10 @@ const U64_MAX_MINUS_ONE: usize = (u64::MAX - 1) as usize;
 ///
 /// [`Frame`]s can be received through the [`WebSocket::receive()`] method.
 /// To extract the underlying data from a received `Frame`,
-/// you can use the convenience methods [`as_text()`](Frame::as_text()),
-/// [`as_binary()`](Frame::as_binary()), [`as_close()`](Frame::as_close()),
-/// [`as_ping()`](Frame::as_ping()), and [`as_pong()`](Frame::as_pong()).
-/// (and their `mut` counterparts), or simply `match`.
+/// you can `match` or use the convenience methods—for example, for text frames,
+/// you can use the method [`as_text`](Frame::as_text()) to get an immutable reference
+/// to the data, [`as_text_mut`](Frame::as_text_mut()) to get a mutable reference to the data,
+/// or [`into_text`](Frame::into_text()) to get ownership of the data.
 ///
 /// # Fragmentation
 ///
