@@ -4,9 +4,8 @@ mod handshake;
 mod parsed_addr;
 mod stream;
 
-use futures::FutureExt;
-use tokio::io::{AsyncWriteExt, BufStream};
 use rand_chacha::ChaCha20Rng;
+use tokio::io::{AsyncWriteExt, BufStream};
 
 use crate::error::WebSocketError;
 use builder::WebSocketBuilder;
@@ -25,74 +24,73 @@ enum FrameType {
 /// Connect directly with [`WebSocket::connect()`]...
 ///
 /// ```
-/// # use websockets::WebSocket;
+/// # use websockets::{WebSocket, WebSocketError};
 /// # #[tokio::main]
-/// # async fn main() {
-/// let mut ws = WebSocket::connect("wss://echo.websocket.org/")
-///     .await
-///     .unwrap();
+/// # async fn main() -> Result<(), WebSocketError> {
+/// let mut ws = WebSocket::connect("wss://echo.websocket.org/").await?;
+/// # Ok(())
 /// # }
 /// ```
 ///
 /// ...or customize the handshake using a [`WebSocketBuilder`] obtained from [`WebSocket::builder()`].
 ///
 /// ```
-/// # use websockets::WebSocket;
+/// # use websockets::{WebSocket, WebSocketError};
 /// # #[tokio::main]
-/// # async fn main() {
+/// # async fn main() -> Result<(), WebSocketError> {
 /// let mut ws = WebSocket::builder()
 ///     .add_subprotocol("wamp")
 ///     .connect("wss://echo.websocket.org")
-///     .await
-///     .unwrap();
+///     .await?;
+/// # Ok(())
 /// # }
 /// ```
 ///
 /// Use the `WebSocket::send*` methods to send frames...
 ///
 /// ```
-/// # use websockets::WebSocket;
+/// # use websockets::{WebSocket, WebSocketError};
 /// # #[tokio::main]
-/// # async fn main() {
+/// # async fn main() -> Result<(), WebSocketError> {
 /// # let mut ws = WebSocket::connect("wss://echo.websocket.org")
 /// #     .await
 /// #     .unwrap();
-/// ws.send_text("foo".to_string(), false, true).await.unwrap();
+/// ws.send_text("foo".to_string()).await?;
+/// # Ok(())
 /// # }
 /// ```
 ///
 /// ...and [`WebSocket::receive()`] to receive frames.
 ///
 /// ```
-/// # use websockets::WebSocket;
+/// # use websockets::{WebSocket, WebSocketError};
 /// # #[tokio::main]
-/// # async fn main() {
+/// # async fn main() -> Result<(), WebSocketError> {
 /// # let mut ws = WebSocket::connect("wss://echo.websocket.org")
-/// #     .await
-/// #     .unwrap();
-/// # ws.send_text("foo".to_string(), false, true).await.unwrap();
-/// let received_frame = ws.receive().await.unwrap();
+/// #     .await?;
+/// # ws.send_text("foo".to_string()).await?;
+/// let received_frame = ws.receive().await?;
 /// let received_msg = received_frame.as_text().unwrap().0.clone();
 /// assert_eq!(received_msg, "foo".to_string()); // echo.websocket.org echoes text frames
+/// # Ok(())
 /// # }
 /// ```
 ///
 /// Finally, close the connection with [`WebSocket::close()`].
 ///
 /// ```
-/// # use websockets::WebSocket;
+/// # use websockets::{WebSocket, WebSocketError};
 /// # #[tokio::main]
-/// # async fn main() {
+/// # async fn main() -> Result<(), WebSocketError> {
 /// #     let mut ws = WebSocket::connect("wss://echo.websocket.org")
-/// #         .await
-/// #         .unwrap();
+/// #         .await?;
 /// let status_code = ws.close(Some((1000, String::new())))
-///     .await
-///     .unwrap()
+///     .await?
 ///     .as_close()
 ///     .unwrap()
 ///     .0;
 /// assert_eq!(status_code, 1000);
+/// # Ok(())
 /// # }
 /// ```
 #[derive(Debug)]
@@ -126,24 +124,11 @@ impl WebSocket {
         Ok(())
     }
 
-    /// Checks whether a frame is ready to be received.
-    pub fn ready_to_receive(&mut self) -> Result<bool, WebSocketError> {
-        let tcp_stream = self.stream.get_mut().get_mut();
-        match tcp_stream.peek(&mut vec![0]).now_or_never() {
-            Some(Ok(bytes_read)) => Ok(bytes_read > 0),
-            Some(Err(e)) => Err(WebSocketError::ReadError(e)),
-            None => Ok(false),
-        }
-    }
-
     /// Receives a [`Frame`] over the WebSocket connection.
     ///
     /// If the received frame is a Ping frame, a Pong frame will be sent.
     /// If the received frame is a Close frame, an echoed Close frame
     /// will be sent and the WebSocket will close.
-    /// 
-    /// This method may block until receiving is ready. To check whether
-    /// data is available to be received, use [`ready_to_receive()`](WebSocket::ready_to_receive()).
     pub async fn receive(&mut self) -> Result<Frame, WebSocketError> {
         if self.shutdown {
             return Err(WebSocketError::WebSocketClosedError);
@@ -180,37 +165,21 @@ impl WebSocket {
     }
 
     /// Sends a Text frame over the WebSocket connection, constructed
-    /// from passed arguments.
-    pub async fn send_text(
-        &mut self,
-        payload: String,
-        continuation: bool,
-        fin: bool,
-    ) -> Result<(), WebSocketError> {
+    /// from passed arguments. `continuation` will be `false` and `fin` will be `true`.
+    /// To use a custom `continuation` or `fin`, construct a [`Frame`] and use
+    /// [`WebSocket::send()`].
+    pub async fn send_text(&mut self, payload: String) -> Result<(), WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.6
-        self.send(Frame::Text {
-            payload,
-            continuation,
-            fin,
-        })
-        .await
+        self.send(Frame::text(payload)).await
     }
 
     /// Sends a Binary frame over the WebSocket connection, constructed
-    /// from passed arguments.
-    pub async fn send_binary(
-        &mut self,
-        payload: Vec<u8>,
-        continuation: bool,
-        fin: bool,
-    ) -> Result<(), WebSocketError> {
+    /// from passed arguments. `continuation` will be `false` and `fin` will be `true`.
+    /// To use a custom `continuation` or `fin`, construct a [`Frame`] and use
+    /// [`WebSocket::send()`].
+    pub async fn send_binary(&mut self, payload: Vec<u8>) -> Result<(), WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.6
-        self.send(Frame::Binary {
-            payload,
-            continuation,
-            fin,
-        })
-        .await
+        self.send(Frame::binary(payload)).await
     }
 
     /// Sends a Close frame over the WebSocket connection, constructed

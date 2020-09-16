@@ -5,16 +5,19 @@
 A WebSocket client implementation.
 
 ```rust
-use websockets::{WebSocket, WebSocketError};
+use websockets::WebSocket;
 
-#[tokio::main]
-async fn main() {
-    let mut ws = WebSocket::connect("wss://echo.websocket.org/").await.unwrap();
-    ws.send_text("foo".to_string(), false, true).await.unwrap();
-    ws.receive().await.unwrap();
-    ws.close(None).await.unwrap();
-}
+let mut ws = WebSocket::connect("wss://echo.websocket.org/").await?;
+ws.send_text("foo".to_string()).await?;
+ws.receive().await?;
+ws.close(None).await?;
 ```
+
+## Features
+
+* Simple API
+* Async/await
+* TLS support
 
 ## Usage
 

@@ -38,12 +38,12 @@ impl Stream {
     //     }
     // }
 
-    pub(super) fn get_mut(&mut self) -> &mut TcpStream {
-        match self {
-            Self::Plain(tcp_stream) => tcp_stream,
-            Self::Tls(tls_stream) => tls_stream.get_mut().get_mut().get_mut(),
-        }
-    }
+    // pub(super) fn get_mut(&mut self) -> &mut TcpStream {
+    //     match self {
+    //         Self::Plain(tcp_stream) => tcp_stream,
+    //         Self::Tls(tls_stream) => tls_stream.get_mut().get_mut().get_mut(),
+    //     }
+    // }
 }
 
 impl AsyncRead for Stream {

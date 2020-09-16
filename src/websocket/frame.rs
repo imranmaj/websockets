@@ -12,23 +12,44 @@ const U64_MAX_MINUS_ONE: usize = (u64::MAX - 1) as usize;
 
 // https://tools.ietf.org/html/rfc6455#section-5.2
 /// Data which is sent and received through the WebSocket connection.
-/// 
+///
 /// # Sending
-/// 
-/// To send a [`Frame`], you can construct it normally and use the [`WebSocket::send()`] method, 
-/// or use the convenience methods for each frame type 
-/// ([`send_text()`](WebSocket::send_text()), [`send_binary()`](WebSocket::send_binary()), 
-/// [`close()`](WebSocket::close()), [`send_ping()`](WebSocket::send_ping()), 
+///
+/// To send a [`Frame`], you can construct it normally and use the [`WebSocket::send()`] method,
+/// or use the convenience methods for each frame type
+/// ([`send_text()`](WebSocket::send_text()), [`send_binary()`](WebSocket::send_binary()),
+/// [`close()`](WebSocket::close()), [`send_ping()`](WebSocket::send_ping()),
 /// and [`send_pong()`](WebSocket::send_pong())).
-/// 
+///
 /// # Receiving
-/// 
+///
 /// [`Frame`]s can be received through the [`WebSocket::receive()`] method.
-/// To extract the underlying data from a received `Frame`, 
+/// To extract the underlying data from a received `Frame`,
 /// you can use the convenience methods [`as_text()`](Frame::as_text()),
 /// [`as_binary()`](Frame::as_binary()), [`as_close()`](Frame::as_close()),
 /// [`as_ping()`](Frame::as_ping()), and [`as_pong()`](Frame::as_pong()).
 /// (and their `mut` counterparts), or simply `match`.
+///
+/// # Fragmentation
+///
+/// As per the WebSocket protocol, frames can actually be fragments in a larger message
+/// (see [https://tools.ietf.org/html/rfc6455#section-5.4](https://tools.ietf.org/html/rfc6455#section-5.4)).
+/// However, the maximum frame size allowed by the WebSocket protocol is larger
+/// than what can be stored in a `Vec`. Therefore, no strategy for splitting messages
+/// into [`Frame`]s is provided by this library.
+///
+/// If you would like to use fragmentation manually, this can be done by setting
+/// the `continuation` and `fin` flags on the `Text` and `Binary` variants.
+/// `continuation` signifies that the [`Frame`] is a Continuation frame in the message,
+/// and `fin` signifies that the [`Frame`] is the final frame in the message
+/// (see the above linked RFC for more details).
+///
+/// For example, if the message contains only one [`Frame`], the single frame
+/// should have `continuation` set to `false` and `fin` set to `true`. If the message
+/// contains more than one frame, the first frame should have `continuation` set to
+/// `false` and `fin` set to `false`, all other frames except the last frame should
+/// have `continuation` set to `true` and `fin` set to `false`, and the last frame should
+/// have `continuation` set to `true` and `fin` set to `true`.
 #[derive(Debug)]
 pub enum Frame {
     /// A Text frame
@@ -67,13 +88,24 @@ pub enum Frame {
 }
 
 impl Frame {
+    /// Constructs a Text frame from the given payload.
+    /// `continuation` will be `false` and `fin` will be `true`.
+    /// This can be modified by chaining [`Frame::set_continuation()`] or [`Frame::set_fin()`].
+    pub fn text(payload: String) -> Self {
+        Self::Text {
+            payload,
+            continuation: false,
+            fin: true,
+        }
+    }
+
     /// Returns whether the frame is a Text frame.
     pub fn is_text(&self) -> bool {
         self.as_text().is_some()
     }
 
     /// Attempts to interpret the frame as a Text frame,
-    /// returning a reference to the underlying data if it is, 
+    /// returning a reference to the underlying data if it is,
     /// and None otherwise.
     pub fn as_text(&self) -> Option<(&String, &bool, &bool)> {
         match self {
@@ -86,7 +118,7 @@ impl Frame {
         }
     }
     /// Attempts to interpret the frame as a Text frame,
-    /// returning a mutable reference to the underlying data if it is, 
+    /// returning a mutable reference to the underlying data if it is,
     /// and None otherwise.
     pub fn as_text_mut(&mut self) -> Option<(&mut String, &mut bool, &mut bool)> {
         match self {
@@ -99,13 +131,38 @@ impl Frame {
         }
     }
 
+    /// Attempts to interpret the frame as a Text frame,
+    /// consuming and returning the underlying data if it is,
+    /// and returning None otherwise.
+    pub fn into_text(self) -> Option<(String, bool, bool)> {
+        match self {
+            Self::Text {
+                payload,
+                continuation,
+                fin,
+            } => Some((payload, continuation, fin)),
+            _ => None,
+        }
+    }
+
+    /// Constructs a Binary frame from the given payload.
+    /// `continuation` will be `false` and `fin` will be `true`.
+    /// This can be modified by chaining [`Frame::set_continuation()`] or [`Frame::set_fin()`].
+    pub fn binary(payload: Vec<u8>) -> Self {
+        Self::Binary {
+            payload,
+            continuation: false,
+            fin: true,
+        }
+    }
+
     /// Returns whether the frame is a Binary frame.
     pub fn is_binary(&self) -> bool {
         self.as_binary().is_some()
     }
 
     /// Attempts to interpret the frame as a Binary frame,
-    /// returning a reference to the underlying data if it is, 
+    /// returning a reference to the underlying data if it is,
     /// and None otherwise.
     pub fn as_binary(&self) -> Option<(&Vec<u8>, &bool, &bool)> {
         match self {
@@ -119,7 +176,7 @@ impl Frame {
     }
 
     /// Attempts to interpret the frame as a Binary frame,
-    /// returning a mutable reference to the underlying data if it is, 
+    /// returning a mutable reference to the underlying data if it is,
     /// and None otherwise.
     pub fn as_binary_mut(&mut self) -> Option<(&mut Vec<u8>, &mut bool, &mut bool)> {
         match self {
@@ -132,13 +189,32 @@ impl Frame {
         }
     }
 
+    /// Attempts to interpret the frame as a Binary frame,
+    /// consuming and returning the underlying data if it is,
+    /// and returning None otherwise.
+    pub fn into_binary(self) -> Option<(Vec<u8>, bool, bool)> {
+        match self {
+            Self::Binary {
+                payload,
+                continuation,
+                fin,
+            } => Some((payload, continuation, fin)),
+            _ => None,
+        }
+    }
+
+    /// Constructs a Close frame from the given payload.
+    pub fn close(payload: Option<(u16, String)>) -> Self {
+        Self::Close { payload }
+    }
+
     /// Returns whether the frame is a Close frame.
     pub fn is_close(&self) -> bool {
         self.as_close().is_some()
     }
 
     /// Attempts to interpret the frame as a Close frame,
-    /// returning a reference to the underlying data if it is, 
+    /// returning a reference to the underlying data if it is,
     /// and None otherwise.
     pub fn as_close(&self) -> Option<&(u16, String)> {
         match self {
@@ -148,7 +224,7 @@ impl Frame {
     }
 
     /// Attempts to interpret the frame as a Close frame,
-    /// returning a mutable reference to the underlying data if it is, 
+    /// returning a mutable reference to the underlying data if it is,
     /// and None otherwise.
     pub fn as_close_mut(&mut self) -> Option<&mut (u16, String)> {
         match self {
@@ -157,13 +233,28 @@ impl Frame {
         }
     }
 
+    /// Attempts to interpret the frame as a Close frame,
+    /// consuming and returning the underlying data if it is,
+    /// and returning None otherwise.
+    pub fn into_close(self) -> Option<(u16, String)> {
+        match self {
+            Self::Close { payload } => payload,
+            _ => None,
+        }
+    }
+
+    /// Constructs a Ping frame from the given payload.
+    pub fn ping(payload: Option<Vec<u8>>) -> Self {
+        Self::Ping { payload }
+    }
+
     /// Returns whether the frame is a Ping frame.
     pub fn is_ping(&self) -> bool {
         self.as_ping().is_some()
     }
 
     /// Attempts to interpret the frame as a Ping frame,
-    /// returning a reference to the underlying data if it is, 
+    /// returning a reference to the underlying data if it is,
     /// and None otherwise.
     pub fn as_ping(&self) -> Option<&Vec<u8>> {
         match self {
@@ -173,7 +264,7 @@ impl Frame {
     }
 
     /// Attempts to interpret the frame as a Ping frame,
-    /// returning a mutable reference to the underlying data if it is, 
+    /// returning a mutable reference to the underlying data if it is,
     /// and None otherwise.
     pub fn as_ping_mut(&mut self) -> Option<&mut Vec<u8>> {
         match self {
@@ -182,13 +273,28 @@ impl Frame {
         }
     }
 
+    /// Attempts to interpret the frame as a Ping frame,
+    /// consuming and returning the underlying data if it is,
+    /// and returning  None otherwise.
+    pub fn into_ping(self) -> Option<Vec<u8>> {
+        match self {
+            Self::Ping { payload } => payload,
+            _ => None,
+        }
+    }
+
+    /// Constructs a Pong frame from the given payload.
+    pub fn pong(payload: Option<Vec<u8>>) -> Self {
+        Self::Pong { payload }
+    }
+
     /// Returns whether the frame is a Pong frame.
     pub fn is_pong(&self) -> bool {
         self.as_pong().is_some()
     }
 
     /// Attempts to interpret the frame as a Pong frame,
-    /// returning a reference to the underlying data if it is, 
+    /// returning a reference to the underlying data if it is,
     /// and None otherwise.
     pub fn as_pong(&self) -> Option<&Vec<u8>> {
         match self {
@@ -198,12 +304,66 @@ impl Frame {
     }
 
     /// Attempts to interpret the frame as a Pong frame,
-    /// returning a mutable reference to the underlying data if it is, 
+    /// returning a mutable reference to the underlying data if it is,
     /// and None otherwise.
     pub fn as_pong_mut(&mut self) -> Option<&mut Vec<u8>> {
         match self {
             Self::Pong { payload } => payload.as_mut(),
             _ => None,
+        }
+    }
+
+    /// Attempts to interpret the frame as a Pong frame,
+    /// consuming and returning the underlying data if it is,
+    /// and returning None otherwise.
+    pub fn into_pong(self) -> Option<Vec<u8>> {
+        match self {
+            Self::Pong { payload } => payload,
+            _ => None,
+        }
+    }
+
+    /// Modifies the frame to set `continuation` to the desired value.
+    /// If the frame is not a Text or Binary frame, no operation is performed.
+    pub fn set_continuation(self, continuation: bool) -> Self {
+        match self {
+            Self::Text { payload, fin, .. } => Self::Text {
+                payload,
+                continuation,
+                fin,
+            },
+            Self::Binary { payload, fin, .. } => Self::Binary {
+                payload,
+                continuation,
+                fin,
+            },
+            _ => self,
+        }
+    }
+
+    /// Modifies the frame to set `fin` to the desired value.
+    /// If the frame is not a Text or Binary frame, no operation is performed.
+    pub fn set_fin(self, fin: bool) -> Self {
+        match self {
+            Self::Text {
+                payload,
+                continuation,
+                ..
+            } => Self::Text {
+                payload,
+                continuation,
+                fin,
+            },
+            Self::Binary {
+                payload,
+                continuation,
+                ..
+            } => Self::Binary {
+                payload,
+                continuation,
+                fin,
+            },
+            _ => self,
         }
     }
 
@@ -421,5 +581,17 @@ impl Frame {
             // reserved range
             0xB..=0xFF => Err(WebSocketError::InvalidFrameError),
         }
+    }
+}
+
+impl From<String> for Frame {
+    fn from(s: String) -> Self {
+        Self::text(s)
+    }
+}
+
+impl From<Vec<u8>> for Frame {
+    fn from(v: Vec<u8>) -> Self {
+        Self::binary(v)
     }
 }
