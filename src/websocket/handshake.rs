@@ -69,11 +69,13 @@ impl Handshake {
             req.push_str(&format!("{}: {}\r\n", field, value));
         }
         req.push_str("\r\n"); // end of request
-        ws.stream
+        ws.write_half
+            .stream
             .write_all(req.as_bytes())
             .await
             .map_err(|e| WebSocketError::WriteError(e))?;
-        ws.stream
+        ws.write_half
+            .stream
             .flush()
             .await
             .map_err(|e| WebSocketError::WriteError(e))?;
@@ -86,7 +88,8 @@ impl Handshake {
         let status_line_regex = Regex::new(r"HTTP/\d+\.\d+ (?P<status_code>\d{3}) .+\r\n").unwrap();
         let mut status_line = String::new();
 
-        ws.stream
+        ws.read_half
+            .stream
             .read_line(&mut status_line)
             .await
             .map_err(|e| WebSocketError::ReadError(e))?;
@@ -99,7 +102,8 @@ impl Handshake {
         let headers_regex = Regex::new(r"(?P<field>.+?):\s*(?P<value>.*?)\s*\r\n").unwrap();
         loop {
             let mut header = String::new();
-            ws.stream
+            ws.read_half
+                .stream
                 .read_line(&mut header)
                 .await
                 .map_err(|e| WebSocketError::ReadError(e))?;
@@ -125,7 +129,8 @@ impl Handshake {
                         .parse::<usize>()
                         .map_err(|_e| WebSocketError::InvalidHandshakeError)?;
                     let mut body = vec![0; body_length];
-                    ws.stream
+                    ws.read_half
+                        .stream
                         .read_exact(&mut body)
                         .await
                         .map_err(|e| WebSocketError::ReadError(e))?;

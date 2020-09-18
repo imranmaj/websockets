@@ -1,12 +1,14 @@
 use std::convert::TryFrom;
+use std::sync::mpsc;
 
-use tokio::io::BufStream;
-use tokio::net::TcpStream;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
+use tokio::io::{self, BufReader, BufWriter};
+use tokio::net::TcpStream;
 
 use super::handshake::Handshake;
 use super::parsed_addr::ParsedAddr;
+use super::split::{WebSocketReadHalf, WebSocketWriteHalf};
 use super::stream::Stream;
 use super::FrameType;
 use super::WebSocket;
@@ -38,9 +40,9 @@ impl WebSocketBuilder {
         }
     }
 
-    /// Builds a [`WebSocket`] using this builder, then connects to a URL 
+    /// Builds a [`WebSocket`] using this builder, then connects to a URL
     /// (and performs the WebSocket handshake).
-    /// 
+    ///
     /// After calling this method, no more methods should be called on this builder.
     pub async fn connect(&mut self, url: &str) -> Result<WebSocket, WebSocketError> {
         let parsed_addr = ParsedAddr::try_from(url)?;
@@ -54,18 +56,23 @@ impl WebSocketBuilder {
             // https://tools.ietf.org/html/rfc6455#section-11.1.1
             "ws" => stream,
             // https://tools.ietf.org/html/rfc6455#section-11.1.2
-            "wss" => {
-                stream
-                    .into_tls(&parsed_addr.host)
-                    .await?
-            }
+            "wss" => stream.into_tls(&parsed_addr.host).await?,
             _ => return Err(WebSocketError::SchemeError),
         };
+        let (read_half, write_half) = io::split(stream);
+        let (sender, receiver) = mpsc::channel();
         let mut ws = WebSocket {
-            stream: BufStream::new(stream),
-            shutdown: false,
-            rng: ChaCha20Rng::from_entropy(),
-            last_frame_type: FrameType::Control,
+            read_half: WebSocketReadHalf {
+                stream: BufReader::new(read_half),
+                last_frame_type: FrameType::default(),
+                sender,
+            },
+            write_half: WebSocketWriteHalf {
+                shutdown: false,
+                stream: BufWriter::new(write_half),
+                rng: ChaCha20Rng::from_entropy(),
+                receiver,
+            },
             accepted_subprotocol: None,
             handshake_response_headers: None,
         };
@@ -113,7 +120,7 @@ impl WebSocketBuilder {
     }
 
     /// Removes a subprotocol from the list of subprotocols that would be sent
-    /// in the WebSocket handshake. 
+    /// in the WebSocket handshake.
     pub fn remove_subprotocol(&mut self, subprotocol: &str) -> &mut Self {
         // https://tools.ietf.org/html/rfc6455#section-1.9
         self.subprotocols.retain(|s| s != subprotocol);

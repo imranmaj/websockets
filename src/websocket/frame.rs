@@ -3,7 +3,10 @@ use std::convert::TryInto;
 use rand::RngCore;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use super::{FrameType, WebSocket};
+use super::split::{WebSocketReadHalf, WebSocketWriteHalf};
+use super::FrameType;
+#[allow(unused_imports)] // for intra doc links
+use super::WebSocket;
 use crate::error::WebSocketError;
 
 const U16_MAX_MINUS_ONE: usize = (u16::MAX - 1) as usize;
@@ -15,7 +18,7 @@ const U64_MAX_MINUS_ONE: usize = (u64::MAX - 1) as usize;
 ///
 /// # Sending
 ///
-/// To send a [`Frame`], you can construct it normally and use the [`WebSocket::send()`] method,
+/// To send a Frame, you can construct it normally and use the [`WebSocket::send()`] method,
 /// or use the convenience methods for each frame type
 /// ([`send_text()`](WebSocket::send_text()), [`send_binary()`](WebSocket::send_binary()),
 /// [`close()`](WebSocket::close()), [`send_ping()`](WebSocket::send_ping()),
@@ -23,8 +26,8 @@ const U64_MAX_MINUS_ONE: usize = (u64::MAX - 1) as usize;
 ///
 /// # Receiving
 ///
-/// [`Frame`]s can be received through the [`WebSocket::receive()`] method.
-/// To extract the underlying data from a received `Frame`,
+/// Frames can be received through the [`WebSocket::receive()`] method.
+/// To extract the underlying data from a received Frame,
 /// you can `match` or use the convenience methods—for example, for text frames,
 /// you can use the method [`as_text`](Frame::as_text()) to get an immutable reference
 /// to the data, [`as_text_mut`](Frame::as_text_mut()) to get a mutable reference to the data,
@@ -36,15 +39,15 @@ const U64_MAX_MINUS_ONE: usize = (u64::MAX - 1) as usize;
 /// (see [https://tools.ietf.org/html/rfc6455#section-5.4](https://tools.ietf.org/html/rfc6455#section-5.4)).
 /// However, the maximum frame size allowed by the WebSocket protocol is larger
 /// than what can be stored in a `Vec`. Therefore, no strategy for splitting messages
-/// into [`Frame`]s is provided by this library.
+/// into Frames is provided by this library.
 ///
 /// If you would like to use fragmentation manually, this can be done by setting
 /// the `continuation` and `fin` flags on the `Text` and `Binary` variants.
-/// `continuation` signifies that the [`Frame`] is a Continuation frame in the message,
-/// and `fin` signifies that the [`Frame`] is the final frame in the message
+/// `continuation` signifies that the Frame is a Continuation frame in the message,
+/// and `fin` signifies that the Frame is the final frame in the message
 /// (see the above linked RFC for more details).
 ///
-/// For example, if the message contains only one [`Frame`], the single frame
+/// For example, if the message contains only one Frame, the single frame
 /// should have `continuation` set to `false` and `fin` set to `true`. If the message
 /// contains more than one frame, the first frame should have `continuation` set to
 /// `false` and `fin` set to `false`, all other frames except the last frame should
@@ -367,7 +370,10 @@ impl Frame {
         }
     }
 
-    pub(super) async fn send(self, ws: &mut WebSocket) -> Result<(), WebSocketError> {
+    pub(super) async fn send(
+        self,
+        write_half: &mut WebSocketWriteHalf,
+    ) -> Result<(), WebSocketError> {
         // calculate before moving payload out of self
         let is_control = self.is_control();
         let opcode = self.opcode();
@@ -418,7 +424,7 @@ impl Frame {
 
         // payload masking: https://tools.ietf.org/html/rfc6455#section-5.3
         let mut masking_key = vec![0; 4];
-        ws.rng.fill_bytes(&mut masking_key);
+        write_half.rng.fill_bytes(&mut masking_key);
         for (i, byte) in payload.iter_mut().enumerate() {
             *byte = *byte ^ (masking_key[i % 4]);
         }
@@ -426,11 +432,13 @@ impl Frame {
 
         raw_frame.append(&mut payload);
 
-        ws.stream
+        write_half
+            .stream
             .write_all(&raw_frame)
             .await
             .map_err(|e| WebSocketError::WriteError(e))?;
-        ws.stream
+        write_half
+            .stream
             .flush()
             .await
             .map_err(|e| WebSocketError::WriteError(e))?;
@@ -482,9 +490,11 @@ impl Frame {
         }
     }
 
-    pub(super) async fn read_from_websocket(ws: &mut WebSocket) -> Result<Self, WebSocketError> {
+    pub(super) async fn read_from_websocket(
+        read_half: &mut WebSocketReadHalf,
+    ) -> Result<Self, WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.2
-        let fin_and_opcode = ws
+        let fin_and_opcode = read_half
             .stream
             .read_u8()
             .await
@@ -492,7 +502,7 @@ impl Frame {
         let fin: bool = fin_and_opcode & 0b10000000_u8 != 0;
         let opcode = fin_and_opcode & 0b00001111_u8;
 
-        let mask_and_payload_len_first_byte = ws
+        let mask_and_payload_len_first_byte = read_half
             .stream
             .read_u8()
             .await
@@ -505,12 +515,12 @@ impl Frame {
         let payload_len_first_byte = mask_and_payload_len_first_byte & 0b01111111_u8;
         let payload_len = match payload_len_first_byte {
             0..=125 => payload_len_first_byte as usize,
-            126 => ws
+            126 => read_half
                 .stream
                 .read_u16()
                 .await
                 .map_err(|e| WebSocketError::ReadError(e))? as usize,
-            127 => ws
+            127 => read_half
                 .stream
                 .read_u64()
                 .await
@@ -519,13 +529,14 @@ impl Frame {
         };
 
         let mut payload = vec![0; payload_len];
-        ws.stream
+        read_half
+            .stream
             .read_exact(&mut payload)
             .await
             .map_err(|e| WebSocketError::ReadError(e))?;
 
         match opcode {
-            0x0 => match ws.last_frame_type {
+            0x0 => match read_half.last_frame_type {
                 FrameType::Text => Ok(Self::Text {
                     payload: String::from_utf8(payload)
                         .map_err(|_e| WebSocketError::InvalidFrameError)?,

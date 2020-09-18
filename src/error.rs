@@ -76,4 +76,9 @@ pub enum WebSocketError {
     /// Error writing to WebSocket
     #[error("could not write to WebSocket")]
     WriteError(IoError),
+
+    // splitting
+    /// Issue with mpsc channel
+    #[error("error using channel")]
+    ChannelError,
 }

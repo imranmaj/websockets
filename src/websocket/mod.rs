@@ -2,15 +2,13 @@ pub mod builder;
 pub mod frame;
 mod handshake;
 mod parsed_addr;
+pub mod split;
 mod stream;
-
-use rand_chacha::ChaCha20Rng;
-use tokio::io::{AsyncWriteExt, BufStream};
 
 use crate::error::WebSocketError;
 use builder::WebSocketBuilder;
 use frame::Frame;
-use stream::Stream;
+use split::{WebSocketReadHalf, WebSocketWriteHalf};
 
 #[derive(Debug)]
 enum FrameType {
@@ -19,9 +17,15 @@ enum FrameType {
     Control,
 }
 
+impl Default for FrameType {
+    fn default() -> Self {
+        Self::Control
+    }
+}
+
 /// Manages the WebSocket connection; used to connect, send data, and receive data.
 ///
-/// Connect directly with [`WebSocket::connect()`]...
+/// Connect with [`WebSocket::connect()`]:
 ///
 /// ```
 /// # use websockets::{WebSocket, WebSocketError};
@@ -32,7 +36,7 @@ enum FrameType {
 /// # }
 /// ```
 ///
-/// ...or customize the handshake using a [`WebSocketBuilder`] obtained from [`WebSocket::builder()`].
+/// Cuustomize the handshake using a [`WebSocketBuilder`] obtained from [`WebSocket::builder()`]:
 ///
 /// ```
 /// # use websockets::{WebSocket, WebSocketError};
@@ -46,7 +50,7 @@ enum FrameType {
 /// # }
 /// ```
 ///
-/// Use the `WebSocket::send*` methods to send frames...
+/// Use the `WebSocket::send*` methods to send frames:
 ///
 /// ```
 /// # use websockets::{WebSocket, WebSocketError};
@@ -60,7 +64,7 @@ enum FrameType {
 /// # }
 /// ```
 ///
-/// ...and [`WebSocket::receive()`] to receive frames.
+/// Use [`WebSocket::receive()`] to receive frames:
 ///
 /// ```
 /// # use websockets::{WebSocket, WebSocketError};
@@ -76,7 +80,7 @@ enum FrameType {
 /// # }
 /// ```
 ///
-/// Finally, close the connection with [`WebSocket::close()`].
+/// Close the connection with [`WebSocket::close()`]:
 ///
 /// ```
 /// # use websockets::{WebSocket, WebSocketError};
@@ -93,12 +97,24 @@ enum FrameType {
 /// # Ok(())
 /// # }
 /// ```
+/// 
+/// # Splitting
+/// 
+/// To facilitate simulataneous reads and writes, the WebSocket can be split
+/// into a [read half](WebSocketReadHalf) and a [write half](WebSocketWriteHalf).
+/// The read half allows frames to be received, while the write half
+/// allows frames to be sent.
+/// 
+/// If the read half receives a Ping or Close frame, it needs to send a
+/// Pong or echo the Close frame and close the WebSocket, respectively. 
+/// The write half is notified of these events, but it cannot act on them
+/// unless it is flushed. Events can be explicitly [`flush`](WebSocketWriteHalf::flush())ed,
+/// but sending a frame will also flush events. If frames are not being
+/// sent frequently, consider explicitly flushing events. 
 #[derive(Debug)]
 pub struct WebSocket {
-    stream: BufStream<Stream>,
-    shutdown: bool,
-    rng: ChaCha20Rng,
-    last_frame_type: FrameType,
+    read_half: WebSocketReadHalf,
+    write_half: WebSocketWriteHalf,
     accepted_subprotocol: Option<String>,
     handshake_response_headers: Option<Vec<(String, String)>>,
 }
@@ -115,53 +131,18 @@ impl WebSocket {
         WebSocketBuilder::new().connect(url).await
     }
 
-    /// Sends an already constructed [`Frame`] over the WebSocket connection.
-    pub async fn send(&mut self, frame: Frame) -> Result<(), WebSocketError> {
-        if self.shutdown {
-            return Err(WebSocketError::WebSocketClosedError);
-        }
-        frame.send(self).await?;
-        Ok(())
-    }
-
     /// Receives a [`Frame`] over the WebSocket connection.
     ///
     /// If the received frame is a Ping frame, a Pong frame will be sent.
     /// If the received frame is a Close frame, an echoed Close frame
     /// will be sent and the WebSocket will close.
     pub async fn receive(&mut self) -> Result<Frame, WebSocketError> {
-        if self.shutdown {
-            return Err(WebSocketError::WebSocketClosedError);
-        }
-        let frame = Frame::read_from_websocket(self).await?;
-        // remember last data frame type in case we get continuation frames (https://tools.ietf.org/html/rfc6455#section-5.2)
-        match frame {
-            Frame::Text { .. } => self.last_frame_type = FrameType::Text,
-            Frame::Binary { .. } => self.last_frame_type = FrameType::Binary,
-            _ => (),
-        };
-        // handle incoming frames
-        match &frame {
-            // echo ping frame (https://tools.ietf.org/html/rfc6455#section-5.5.2)
-            Frame::Ping { payload } => {
-                let pong = Frame::Pong {
-                    payload: payload.clone(),
-                };
-                self.send(pong).await?;
-            }
-            // echo close frame and shutdown (https://tools.ietf.org/html/rfc6455#section-1.4)
-            Frame::Close { payload } => {
-                let close = Frame::Close {
-                    payload: payload
-                        .as_ref()
-                        .map(|(status_code, _reason)| (status_code.clone(), String::new())),
-                };
-                self.send(close).await?;
-                self.shutdown().await?;
-            }
-            _ => (),
-        }
-        Ok(frame)
+        self.read_half.receive().await
+    }
+
+    /// Sends an already constructed [`Frame`] over the WebSocket connection.
+    pub async fn send(&mut self, frame: Frame) -> Result<(), WebSocketError> {
+        self.write_half.send(frame).await
     }
 
     /// Sends a Text frame over the WebSocket connection, constructed
@@ -169,8 +150,7 @@ impl WebSocket {
     /// To use a custom `continuation` or `fin`, construct a [`Frame`] and use
     /// [`WebSocket::send()`].
     pub async fn send_text(&mut self, payload: String) -> Result<(), WebSocketError> {
-        // https://tools.ietf.org/html/rfc6455#section-5.6
-        self.send(Frame::text(payload)).await
+        self.write_half.send_text(payload).await
     }
 
     /// Sends a Binary frame over the WebSocket connection, constructed
@@ -178,58 +158,62 @@ impl WebSocket {
     /// To use a custom `continuation` or `fin`, construct a [`Frame`] and use
     /// [`WebSocket::send()`].
     pub async fn send_binary(&mut self, payload: Vec<u8>) -> Result<(), WebSocketError> {
-        // https://tools.ietf.org/html/rfc6455#section-5.6
-        self.send(Frame::binary(payload)).await
+        self.write_half.send_binary(payload).await
     }
 
     /// Sends a Close frame over the WebSocket connection, constructed
     /// from passed arguments, and closes the WebSocket connection.
     /// This method will attempt to wait for an echoed Close frame,
     /// which is returned.
-    pub async fn close(&mut self, payload: Option<(u16, String)>) -> Result<Frame, WebSocketError> {
-        // https://tools.ietf.org/html/rfc6455#section-5.5.1
-        if self.shutdown {
-            Err(WebSocketError::WebSocketClosedError)
-        } else {
-            self.send(Frame::Close { payload }).await?;
-            let resp = self.receive().await?;
-            self.shutdown().await?;
-            Ok(resp)
-        }
+    pub async fn close(&mut self, payload: Option<(u16, String)>) -> Result<(), WebSocketError> {
+        self.write_half.close(payload).await
     }
 
     /// Sends a Ping frame over the WebSocket connection, constructed
     /// from passed arguments.
     pub async fn send_ping(&mut self, payload: Option<Vec<u8>>) -> Result<(), WebSocketError> {
-        // https://tools.ietf.org/html/rfc6455#section-5.5.2
-        self.send(Frame::Ping { payload }).await
+        self.write_half.send_ping(payload).await
     }
 
     /// Sends a Pong frame over the WebSocket connection, constructed
     /// from passed arguments.
     pub async fn send_pong(&mut self, payload: Option<Vec<u8>>) -> Result<(), WebSocketError> {
-        // https://tools.ietf.org/html/rfc6455#section-5.5.3
-        self.send(Frame::Pong { payload }).await
+        self.write_half.send_pong(payload).await
     }
 
     /// Shuts down the WebSocket connection **without sending a Close frame**.
     /// It is recommended to use the [`close()`](WebSocket::close()) method instead.
     pub async fn shutdown(&mut self) -> Result<(), WebSocketError> {
-        self.shutdown = true;
-        self.stream
-            .shutdown()
-            .await
-            .map_err(|e| WebSocketError::ShutdownError(e))
+        self.write_half.shutdown().await
+    }
+
+    /// Splits the WebSocket into a read half and a write half, which can be used separately.
+    /// [Accepted subprotocol](WebSocket::accepted_subprotocol())
+    /// and [handshake response headers](WebSocket::handshake_response_headers()) data
+    /// will be lost.
+    pub fn split(self) -> (WebSocketReadHalf, WebSocketWriteHalf) {
+        (self.read_half, self.write_half)
+    }
+
+    /// Joins together a split read half and write half to reconstruct a WebSocket.
+    pub fn join(read_half: WebSocketReadHalf, write_half: WebSocketWriteHalf) -> Self {
+        Self {
+            read_half,
+            write_half,
+            accepted_subprotocol: None,
+            handshake_response_headers: None,
+        }
     }
 
     /// Returns the subprotocol that was accepted by the server during the handshake,
-    /// if any.
+    /// if any. This data will be lost if the WebSocket is [`split`](WebSocket::split()).
     pub fn accepted_subprotocol(&self) -> &Option<String> {
         // https://tools.ietf.org/html/rfc6455#section-1.9
         &self.accepted_subprotocol
     }
 
     /// Returns the headers that were returned by the server during the handshake.
+    /// This data will be lost if the WebSocket is [`split`](WebSocket::split()).
     pub fn handshake_response_headers(&self) -> &Option<Vec<(String, String)>> {
         // https://tools.ietf.org/html/rfc6455#section-4.2.2
         &self.handshake_response_headers
