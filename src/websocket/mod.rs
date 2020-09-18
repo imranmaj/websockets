@@ -99,7 +99,7 @@ impl Default for FrameType {
 ///
 /// # Splitting
 ///
-/// To facilitate simulataneous reads and writes, the WebSocket can be split
+/// To facilitate simulataneous reads and writes, the `WebSocket` can be split
 /// into a [read half](WebSocketReadHalf) and a [write half](WebSocketWriteHalf).
 /// The read half allows frames to be received, while the write half
 /// allows frames to be sent.
@@ -110,6 +110,8 @@ impl Default for FrameType {
 /// unless it is flushed. Events can be explicitly [`flush`](WebSocketWriteHalf::flush())ed,
 /// but sending a frame will also flush events. If frames are not being
 /// sent frequently, consider explicitly flushing events.
+/// 
+/// Flushing is done automatically if you are using the the `WebSocket` type by itself.
 #[derive(Debug)]
 pub struct WebSocket {
     read_half: WebSocketReadHalf,
@@ -136,7 +138,9 @@ impl WebSocket {
     /// If the received frame is a Close frame, an echoed Close frame
     /// will be sent and the WebSocket will close.
     pub async fn receive(&mut self) -> Result<Frame, WebSocketError> {
-        self.read_half.receive().await
+        let received_frame = self.read_half.receive().await?;
+        self.write_half.flush().await?;
+        Ok(received_frame)
     }
 
     /// Sends an already constructed [`Frame`] over the WebSocket connection.

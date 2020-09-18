@@ -30,7 +30,7 @@ impl WebSocketReadHalf {
     /// Receives a [`Frame`] over the WebSocket connection.
     ///
     /// If the received frame is a Ping frame, an event to send a Pong frame will be queued.
-    /// If the received frame is a Close frame, an event to send a  Close frame
+    /// If the received frame is a Close frame, an event to send a Close frame
     /// will be queued and the WebSocket will close. However, events are not
     /// acted upon unless flushed (see the documentation on the [`WebSocket`](WebSocket#splitting)
     /// type for more details).
@@ -109,6 +109,10 @@ impl WebSocketWriteHalf {
     }
 
     /// Sends an already constructed [`Frame`] over the WebSocket connection.
+    /// 
+    /// This method will flush incoming events. 
+    /// See the documentation on the [`WebSocket`](WebSocket#splitting) type for more details
+    /// about events.
     pub async fn send(&mut self, frame: Frame) -> Result<(), WebSocketError> {
         self.flush().await?;
         if self.shutdown || self.sent_closed {
@@ -119,6 +123,8 @@ impl WebSocketWriteHalf {
 
     /// Sends an already constructed [`Frame`] over the WebSocket connection
     /// without flushing incoming events from the read half.
+    /// See the documentation on the [`WebSocket`](WebSocket#splitting) type for more details
+    /// about events.
     async fn send_without_events_check(&mut self, frame: Frame) -> Result<(), WebSocketError> {
         frame.send(self).await?;
         Ok(())
@@ -128,6 +134,10 @@ impl WebSocketWriteHalf {
     /// from passed arguments. `continuation` will be `false` and `fin` will be `true`.
     /// To use a custom `continuation` or `fin`, construct a [`Frame`] and use
     /// [`WebSocketWriteHalf::send()`].
+    /// 
+    /// This method will flush incoming events. 
+    /// See the documentation on the [`WebSocket`](WebSocket#splitting) type for more details
+    /// about events.
     pub async fn send_text(&mut self, payload: String) -> Result<(), WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.6
         self.send(Frame::text(payload)).await
@@ -137,6 +147,10 @@ impl WebSocketWriteHalf {
     /// from passed arguments. `continuation` will be `false` and `fin` will be `true`.
     /// To use a custom `continuation` or `fin`, construct a [`Frame`] and use
     /// [`WebSocketWriteHalf::send()`].
+    /// 
+    /// This method will flush incoming events. 
+    /// See the documentation on the [`WebSocket`](WebSocket#splitting) type for more details
+    /// about events.
     pub async fn send_binary(&mut self, payload: Vec<u8>) -> Result<(), WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.6
         self.send(Frame::binary(payload)).await
@@ -162,6 +176,10 @@ impl WebSocketWriteHalf {
     /// As per the WebSocket protocol, the server should send a Close frame in response
     /// upon receiving a Close frame. Although the write half will be closed,
     /// the server's echoed Close frame can be read from the still open read half.
+    /// 
+    /// This method will flush incoming events. 
+    /// See the documentation on the [`WebSocket`](WebSocket#splitting) type for more details
+    /// about events.
     pub async fn close(&mut self, payload: Option<(u16, String)>) -> Result<(), WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.5.1
         self.send(Frame::Close { payload }).await?;
@@ -171,6 +189,10 @@ impl WebSocketWriteHalf {
 
     /// Sends a Ping frame over the WebSocket connection, constructed
     /// from passed arguments.
+    /// 
+    /// This method will flush incoming events. 
+    /// See the documentation on the [`WebSocket`](WebSocket#splitting) type for more details
+    /// about events.
     pub async fn send_ping(&mut self, payload: Option<Vec<u8>>) -> Result<(), WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.5.2
         self.send(Frame::Ping { payload }).await
@@ -178,6 +200,10 @@ impl WebSocketWriteHalf {
 
     /// Sends a Pong frame over the WebSocket connection, constructed
     /// from passed arguments.
+    /// 
+    /// This method will flush incoming events. 
+    /// See the documentation on the [`WebSocket`](WebSocket#splitting) type for more details
+    /// about events.
     pub async fn send_pong(&mut self, payload: Option<Vec<u8>>) -> Result<(), WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.5.3
         self.send(Frame::Pong { payload }).await
