@@ -143,6 +143,17 @@ impl WebSocket {
         Ok(received_frame)
     }
 
+    /// Receives a [`Frame`] over the WebSocket connection **without handling incoming frames.**
+    /// For example, receiving a Ping frame will not queue a Pong frame to be sent,
+    /// and receiving a Close frame will not queue a Close frame to be sent nor close
+    /// the connection.
+    /// 
+    /// To automatically handle incoming frames, use the [`receive()`](WebSocket::receive())
+    /// method instead.
+    pub async fn receive_without_handling(&mut self) -> Result<Frame, WebSocketError> {
+        self.read_half.receive_without_handling().await
+    }
+
     /// Sends an already constructed [`Frame`] over the WebSocket connection.
     pub async fn send(&mut self, frame: Frame) -> Result<(), WebSocketError> {
         self.write_half.send(frame).await

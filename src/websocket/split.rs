@@ -35,13 +35,7 @@ impl WebSocketReadHalf {
     /// acted upon unless flushed (see the documentation on the [`WebSocket`](WebSocket#splitting)
     /// type for more details).
     pub async fn receive(&mut self) -> Result<Frame, WebSocketError> {
-        let frame = Frame::read_from_websocket(self).await?;
-        // remember last data frame type in case we get continuation frames (https://tools.ietf.org/html/rfc6455#section-5.2)
-        match frame {
-            Frame::Text { .. } => self.last_frame_type = FrameType::Text,
-            Frame::Binary { .. } => self.last_frame_type = FrameType::Binary,
-            _ => (),
-        };
+        let frame = self.receive_without_handling().await?;
         // handle incoming frames
         match &frame {
             // echo ping frame (https://tools.ietf.org/html/rfc6455#section-5.5.2)
@@ -66,6 +60,24 @@ impl WebSocketReadHalf {
             }
             _ => (),
         }
+        Ok(frame)
+    }
+
+    /// Receives a [`Frame`] over the WebSocket connection **without handling incoming frames.**
+    /// For example, receiving a Ping frame will not queue a Pong frame to be sent,
+    /// and receiving a Close frame will not queue a Close frame to be sent nor close
+    /// the connection.
+    /// 
+    /// To automatically handle incoming frames, use the [`receive()`](WebSocketReadHalf::receive())
+    /// method instead.
+    pub async fn receive_without_handling(&mut self) -> Result<Frame, WebSocketError> {
+        let frame = Frame::read_from_websocket(self).await?;
+        // remember last data frame type in case we get continuation frames (https://tools.ietf.org/html/rfc6455#section-5.2)
+        match frame {
+            Frame::Text { .. } => self.last_frame_type = FrameType::Text,
+            Frame::Binary { .. } => self.last_frame_type = FrameType::Binary,
+            _ => (),
+        };
         Ok(frame)
     }
 }
