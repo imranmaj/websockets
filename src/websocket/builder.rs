@@ -16,14 +16,14 @@ use crate::error::WebSocketError;
 
 /// A builder used to customize the WebSocket handshake.
 /// ```
-/// # use websockets::WebSocket;
+/// # use websockets::{WebSocket, WebSocketError};
 /// # #[tokio::main]
-/// # async fn main() {
+/// # async fn main() -> Result<(), WebSocketError> {
 /// let mut ws = WebSocket::builder()
 ///     .add_subprotocol("wamp")
 ///     .connect("wss://echo.websocket.org")
-///     .await
-///     .unwrap();
+///     .await?;
+/// # Ok(())
 /// # }
 /// ```
 #[derive(Debug)]
@@ -69,6 +69,7 @@ impl WebSocketBuilder {
             },
             write_half: WebSocketWriteHalf {
                 shutdown: false,
+                sent_closed: false,
                 stream: BufWriter::new(write_half),
                 rng: ChaCha20Rng::from_entropy(),
                 receiver,

@@ -57,8 +57,7 @@ impl Default for FrameType {
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), WebSocketError> {
 /// # let mut ws = WebSocket::connect("wss://echo.websocket.org")
-/// #     .await
-/// #     .unwrap();
+/// #     .await?;
 /// ws.send_text("foo".to_string()).await?;
 /// # Ok(())
 /// # }
@@ -67,15 +66,17 @@ impl Default for FrameType {
 /// Use [`WebSocket::receive()`] to receive frames:
 ///
 /// ```
-/// # use websockets::{WebSocket, WebSocketError};
+/// # use websockets::{WebSocket, WebSocketError, Frame};
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), WebSocketError> {
 /// # let mut ws = WebSocket::connect("wss://echo.websocket.org")
 /// #     .await?;
 /// # ws.send_text("foo".to_string()).await?;
-/// let received_frame = ws.receive().await?;
-/// let received_msg = received_frame.as_text().unwrap().0.clone();
-/// assert_eq!(received_msg, "foo".to_string()); // echo.websocket.org echoes text frames
+/// if let Frame::Text { payload: received_msg, .. } =  ws.receive().await? {
+///     // echo.websocket.org echoes text frames
+///     assert_eq!(received_msg, "foo".to_string());
+/// }
+/// # else { panic!() }
 /// # Ok(())
 /// # }
 /// ```
@@ -83,34 +84,32 @@ impl Default for FrameType {
 /// Close the connection with [`WebSocket::close()`]:
 ///
 /// ```
-/// # use websockets::{WebSocket, WebSocketError};
+/// # use websockets::{WebSocket, WebSocketError, Frame};
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), WebSocketError> {
 /// #     let mut ws = WebSocket::connect("wss://echo.websocket.org")
 /// #         .await?;
-/// let status_code = ws.close(Some((1000, String::new())))
-///     .await?
-///     .as_close()
-///     .unwrap()
-///     .0;
-/// assert_eq!(status_code, 1000);
+/// ws.close(Some((1000, String::new()))).await?;
+/// if let Frame::Close{ payload: Some((status_code, _reason)) } = ws.receive().await? {
+///     assert_eq!(status_code, 1000);
+/// }
 /// # Ok(())
 /// # }
 /// ```
-/// 
+///
 /// # Splitting
-/// 
+///
 /// To facilitate simulataneous reads and writes, the WebSocket can be split
 /// into a [read half](WebSocketReadHalf) and a [write half](WebSocketWriteHalf).
 /// The read half allows frames to be received, while the write half
 /// allows frames to be sent.
-/// 
+///
 /// If the read half receives a Ping or Close frame, it needs to send a
-/// Pong or echo the Close frame and close the WebSocket, respectively. 
+/// Pong or echo the Close frame and close the WebSocket, respectively.
 /// The write half is notified of these events, but it cannot act on them
 /// unless it is flushed. Events can be explicitly [`flush`](WebSocketWriteHalf::flush())ed,
 /// but sending a frame will also flush events. If frames are not being
-/// sent frequently, consider explicitly flushing events. 
+/// sent frequently, consider explicitly flushing events.
 #[derive(Debug)]
 pub struct WebSocket {
     read_half: WebSocketReadHalf,

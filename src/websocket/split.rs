@@ -13,8 +13,8 @@ use crate::error::WebSocketError;
 /// Events sent from the read half to the write half
 #[derive(Debug)]
 pub(super) enum Event {
-    Shutdown,
-    SendFrame(Frame),
+    SendPongFrame(Frame),
+    SendCloseFrameAndShutdown(Frame),
 }
 
 /// The read half of a WebSocket connection, generated from [`WebSocket::split()`].
@@ -50,7 +50,7 @@ impl WebSocketReadHalf {
                     payload: payload.clone(),
                 };
                 self.sender
-                    .send(Event::SendFrame(pong))
+                    .send(Event::SendPongFrame(pong))
                     .map_err(|_e| WebSocketError::ChannelError)?;
             }
             // echo close frame and shutdown (https://tools.ietf.org/html/rfc6455#section-1.4)
@@ -61,10 +61,7 @@ impl WebSocketReadHalf {
                         .map(|(status_code, _reason)| (status_code.clone(), String::new())),
                 };
                 self.sender
-                    .send(Event::SendFrame(close))
-                    .map_err(|_e| WebSocketError::ChannelError)?;
-                self.sender
-                    .send(Event::Shutdown)
+                    .send(Event::SendCloseFrameAndShutdown(close))
                     .map_err(|_e| WebSocketError::ChannelError)?;
             }
             _ => (),
@@ -78,6 +75,7 @@ impl WebSocketReadHalf {
 #[derive(Debug)]
 pub struct WebSocketWriteHalf {
     pub(super) shutdown: bool,
+    pub(super) sent_closed: bool,
     pub(super) stream: BufWriter<WriteHalf<Stream>>,
     pub(super) rng: ChaCha20Rng,
     pub(super) receiver: Receiver<Event>,
@@ -86,17 +84,26 @@ pub struct WebSocketWriteHalf {
 impl WebSocketWriteHalf {
     /// Flushes incoming events from the read half. If the read half received a Ping frame,
     /// a Pong frame will be sent. If the read half received a Close frame,
-    /// an echoed Close frame will be sent and the WebSocket will close. 
-    /// See the documentation on the [`WebSocket`](WebSocket#splitting) type for more details 
+    /// an echoed Close frame will be sent and the WebSocket will close.
+    /// See the documentation on the [`WebSocket`](WebSocket#splitting) type for more details
     /// about events.
     pub async fn flush(&mut self) -> Result<(), WebSocketError> {
         while let Ok(event) = self.receiver.try_recv() {
-            if !self.shutdown {
-                match event {
-                    Event::Shutdown => self.shutdown().await?,
-                    Event::SendFrame(frame) => self.send_without_events_check(frame).await?,
-                };
+            if self.shutdown {
+                break;
             }
+            match event {
+                Event::SendPongFrame(frame) => self.send_without_events_check(frame).await?,
+                Event::SendCloseFrameAndShutdown(frame) => {
+                    // read half will always send this event if it has received a close frame,
+                    // but if we have sent one already, then we have sent and received a close
+                    // frame, so we will shutdown
+                    if self.sent_closed {
+                        self.send_without_events_check(frame).await?;
+                        self.shutdown().await?;
+                    }
+                }
+            };
         }
         Ok(())
     }
@@ -104,7 +111,7 @@ impl WebSocketWriteHalf {
     /// Sends an already constructed [`Frame`] over the WebSocket connection.
     pub async fn send(&mut self, frame: Frame) -> Result<(), WebSocketError> {
         self.flush().await?;
-        if self.shutdown {
+        if self.shutdown || self.sent_closed {
             return Err(WebSocketError::WebSocketClosedError);
         }
         self.send_without_events_check(frame).await
@@ -142,7 +149,10 @@ impl WebSocketWriteHalf {
             .shutdown()
             .await
             .map_err(|e| WebSocketError::ShutdownError(e))?;
-        self.shutdown = true;
+        // indicates that a closed frame has been sent, so no more frames should be sent,
+        // but the underlying stream is not technically closed (closing the stream
+        // would prevent a Close frame from being received by the read half)
+        self.sent_closed = true;
         Ok(())
     }
 
@@ -154,13 +164,9 @@ impl WebSocketWriteHalf {
     /// the server's echoed Close frame can be read from the still open read half.
     pub async fn close(&mut self, payload: Option<(u16, String)>) -> Result<(), WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.5.1
-        if self.shutdown {
-            Err(WebSocketError::WebSocketClosedError)
-        } else {
-            self.send(Frame::Close { payload }).await?;
-            self.shutdown().await?;
-            Ok(())
-        }
+        self.send(Frame::Close { payload }).await?;
+        // self.shutdown().await?;
+        Ok(())
     }
 
     /// Sends a Ping frame over the WebSocket connection, constructed
