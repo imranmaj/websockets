@@ -5,6 +5,8 @@ mod parsed_addr;
 pub mod split;
 mod stream;
 
+use native_tls::TlsConnector;
+
 use crate::error::WebSocketError;
 use builder::WebSocketBuilder;
 use frame::Frame;
@@ -31,7 +33,7 @@ impl Default for FrameType {
 /// # use websockets::{WebSocket, WebSocketError};
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), WebSocketError> {
-/// let mut ws = WebSocket::connect("wss://echo.websocket.org/").await?;
+/// let mut ws = WebSocket::connect("wss://echo.websocket.org/", None).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -44,7 +46,7 @@ impl Default for FrameType {
 /// # async fn main() -> Result<(), WebSocketError> {
 /// let mut ws = WebSocket::builder()
 ///     .add_subprotocol("wamp")
-///     .connect("wss://echo.websocket.org")
+///     .connect("wss://echo.websocket.org", None)
 ///     .await?;
 /// # Ok(())
 /// # }
@@ -56,7 +58,7 @@ impl Default for FrameType {
 /// # use websockets::{WebSocket, WebSocketError};
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), WebSocketError> {
-/// # let mut ws = WebSocket::connect("wss://echo.websocket.org")
+/// # let mut ws = WebSocket::connect("wss://echo.websocket.org", None)
 /// #     .await?;
 /// ws.send_text("foo".to_string()).await?;
 /// # Ok(())
@@ -69,7 +71,7 @@ impl Default for FrameType {
 /// # use websockets::{WebSocket, WebSocketError, Frame};
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), WebSocketError> {
-/// # let mut ws = WebSocket::connect("wss://echo.websocket.org")
+/// # let mut ws = WebSocket::connect("wss://echo.websocket.org", None)
 /// #     .await?;
 /// # ws.send_text("foo".to_string()).await?;
 /// if let Frame::Text { payload: received_msg, .. } =  ws.receive().await? {
@@ -87,7 +89,7 @@ impl Default for FrameType {
 /// # use websockets::{WebSocket, WebSocketError, Frame};
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), WebSocketError> {
-/// #     let mut ws = WebSocket::connect("wss://echo.websocket.org")
+/// #     let mut ws = WebSocket::connect("wss://echo.websocket.org", None)
 /// #         .await?;
 /// ws.close(Some((1000, String::new()))).await?;
 /// if let Frame::Close{ payload: Some((status_code, _reason)) } = ws.receive().await? {
@@ -110,7 +112,7 @@ impl Default for FrameType {
 /// unless it is flushed. Events can be explicitly [`flush`](WebSocketWriteHalf::flush())ed,
 /// but sending a frame will also flush events. If frames are not being
 /// sent frequently, consider explicitly flushing events.
-/// 
+///
 /// Flushing is done automatically if you are using the the `WebSocket` type by itself.
 #[derive(Debug)]
 pub struct WebSocket {
@@ -128,8 +130,11 @@ impl WebSocket {
     }
 
     /// Connects to a URL (and performs the WebSocket handshake).
-    pub async fn connect(url: &str) -> Result<Self, WebSocketError> {
-        WebSocketBuilder::new().connect(url).await
+    pub async fn connect(
+        url: &str,
+        ssl_config: Option<TlsConnector>,
+    ) -> Result<Self, WebSocketError> {
+        WebSocketBuilder::new().connect(url, ssl_config).await
     }
 
     /// Receives a [`Frame`] over the WebSocket connection.
@@ -147,7 +152,7 @@ impl WebSocket {
     /// For example, receiving a Ping frame will not queue a Pong frame to be sent,
     /// and receiving a Close frame will not queue a Close frame to be sent nor close
     /// the connection.
-    /// 
+    ///
     /// To automatically handle incoming frames, use the [`receive()`](WebSocket::receive())
     /// method instead.
     pub async fn receive_without_handling(&mut self) -> Result<Frame, WebSocketError> {

@@ -8,7 +8,7 @@
 //!
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), WebSocketError> {
-//! let mut ws = WebSocket::connect("wss://echo.websocket.org/").await?;
+//! let mut ws = WebSocket::connect("wss://echo.websocket.org/", None).await?;
 //! ws.send_text("foo".to_string()).await?;
 //! ws.receive().await?;
 //! ws.close(None).await?;
@@ -27,9 +27,9 @@
 //! The [`WebSocket`] type manages the WebSocket connection.
 //! Use it to connect, send, and receive data.
 //! Data is sent and received through [`Frame`]s.
-//! 
+//!
 //! ## License
-//! 
+//!
 //! This project is licensed under the MIT license.
 
 #![forbid(
@@ -53,7 +53,7 @@ mod tests {
 
     #[tokio::test]
     async fn echo_length_0_to_125() {
-        let mut ws = WebSocket::connect("ws://echo.websocket.org/")
+        let mut ws = WebSocket::connect("ws://echo.websocket.org/", None)
             .await
             .unwrap();
         let message = "a".repeat(3).to_string();
@@ -65,7 +65,7 @@ mod tests {
 
     #[tokio::test]
     async fn echo_length_126_to_u16_max() {
-        let mut ws = WebSocket::connect("ws://echo.websocket.org/")
+        let mut ws = WebSocket::connect("ws://echo.websocket.org/", None)
             .await
             .unwrap();
         let message = "a".repeat(300).to_string();
@@ -77,7 +77,7 @@ mod tests {
 
     #[tokio::test]
     async fn echo_length_u16_max_to_u64_max() {
-        let mut ws = WebSocket::connect("ws://echo.websocket.org/")
+        let mut ws = WebSocket::connect("ws://echo.websocket.org/", None)
             .await
             .unwrap();
         let message = "a".repeat(66000).to_string();
@@ -89,7 +89,7 @@ mod tests {
 
     #[tokio::test]
     async fn echo_tls() {
-        let mut ws = WebSocket::connect("wss://echo.websocket.org/")
+        let mut ws = WebSocket::connect("wss://echo.websocket.org/", None)
             .await
             .unwrap();
         let message = "a".repeat(66000).to_string();
@@ -101,7 +101,14 @@ mod tests {
 
     #[tokio::test]
     async fn close() {
-        let mut ws = WebSocket::connect("wss://echo.websocket.org")
+        let tls_opts = Some(
+            native_tls::TlsConnector::builder()
+                .danger_accept_invalid_certs(true)
+                .danger_accept_invalid_hostnames(true)
+                .build()
+                .unwrap(),
+        );
+        let mut ws = WebSocket::connect("wss://echo.websocket.org", tls_opts)
             .await
             .unwrap();
         ws.close(Some((1000, String::new()))).await.unwrap();
@@ -111,7 +118,7 @@ mod tests {
 
     #[tokio::test]
     async fn bad_scheme() {
-        let resp = WebSocket::connect("http://echo.websocket.org").await;
+        let resp = WebSocket::connect("http://echo.websocket.org", None).await;
         if let Ok(_) = resp {
             panic!("expected to fail with bad scheme");
         }

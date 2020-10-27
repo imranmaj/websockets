@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 use std::sync::mpsc;
 
+use native_tls::TlsConnector;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use tokio::io::{self, BufReader, BufWriter};
@@ -21,7 +22,7 @@ use crate::error::WebSocketError;
 /// # async fn main() -> Result<(), WebSocketError> {
 /// let mut ws = WebSocket::builder()
 ///     .add_subprotocol("wamp")
-///     .connect("wss://echo.websocket.org")
+///     .connect("wss://echo.websocket.org", None)
 ///     .await?;
 /// # Ok(())
 /// # }
@@ -44,7 +45,11 @@ impl WebSocketBuilder {
     /// (and performs the WebSocket handshake).
     ///
     /// After calling this method, no more methods should be called on this builder.
-    pub async fn connect(&mut self, url: &str) -> Result<WebSocket, WebSocketError> {
+    pub async fn connect(
+        &mut self,
+        url: &str,
+        ssl_config: Option<TlsConnector>,
+    ) -> Result<WebSocket, WebSocketError> {
         let parsed_addr = ParsedAddr::try_from(url)?;
 
         let stream = Stream::Plain(
@@ -56,7 +61,7 @@ impl WebSocketBuilder {
             // https://tools.ietf.org/html/rfc6455#section-11.1.1
             "ws" => stream,
             // https://tools.ietf.org/html/rfc6455#section-11.1.2
-            "wss" => stream.into_tls(&parsed_addr.host).await?,
+            "wss" => stream.into_tls(&parsed_addr.host, ssl_config).await?,
             _ => return Err(WebSocketError::SchemeError),
         };
         let (read_half, write_half) = io::split(stream);
