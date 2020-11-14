@@ -27,19 +27,16 @@
 //! The [`WebSocket`] type manages the WebSocket connection.
 //! Use it to connect, send, and receive data.
 //! Data is sent and received through [`Frame`]s.
-//! 
+//!
 //! ## License
-//! 
+//!
 //! This project is licensed under the MIT license.
 
-#![forbid(
-    unsafe_code,
-    missing_debug_implementations,
-    missing_crate_level_docs,
-    missing_docs
-)]
+#![forbid(unsafe_code, missing_debug_implementations, missing_docs)]
+#![deny(missing_debug_implementations)]
 
 mod error;
+mod secure;
 mod websocket;
 
 pub use error::WebSocketError;

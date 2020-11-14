@@ -15,12 +15,14 @@ pub(super) enum Stream {
 }
 
 impl Stream {
-    pub(super) async fn into_tls(self, host: &str) -> Result<Self, WebSocketError> {
+    pub(super) async fn into_tls(
+        self,
+        host: &str,
+        tls_connector: NativeTlsTlsConnector,
+    ) -> Result<Self, WebSocketError> {
         match self {
             Self::Plain(tcp_stream) => {
-                let connector: TokioTlsConnector = NativeTlsTlsConnector::new()
-                    .map_err(|e| WebSocketError::TlsConnectionError(e))?
-                    .into();
+                let connector: TokioTlsConnector = tls_connector.into();
                 let tls_stream = connector
                     .connect(host, tcp_stream)
                     .await

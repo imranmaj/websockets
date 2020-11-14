@@ -1,6 +1,9 @@
 use std::convert::TryFrom;
 use std::sync::mpsc;
 
+use native_tls::{
+    TlsConnector as NativeTlsConnector, TlsConnectorBuilder as NativeTlsConnectorBuilder,
+};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use tokio::io::{self, BufReader, BufWriter};
@@ -13,6 +16,7 @@ use super::stream::Stream;
 use super::FrameType;
 use super::WebSocket;
 use crate::error::WebSocketError;
+use crate::secure::{TlsCertificate, TlsIdentity, TlsProtocol};
 
 /// A builder used to customize the WebSocket handshake.
 /// ```
@@ -26,10 +30,11 @@ use crate::error::WebSocketError;
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug)]
+#[allow(missing_debug_implementations)]
 pub struct WebSocketBuilder {
     additional_handshake_headers: Vec<(String, String)>,
     subprotocols: Vec<String>,
+    tls_connector_builder: NativeTlsConnectorBuilder,
 }
 
 impl WebSocketBuilder {
@@ -37,6 +42,7 @@ impl WebSocketBuilder {
         Self {
             additional_handshake_headers: Vec::new(),
             subprotocols: Vec::new(),
+            tls_connector_builder: NativeTlsConnector::builder(),
         }
     }
 
@@ -56,7 +62,13 @@ impl WebSocketBuilder {
             // https://tools.ietf.org/html/rfc6455#section-11.1.1
             "ws" => stream,
             // https://tools.ietf.org/html/rfc6455#section-11.1.2
-            "wss" => stream.into_tls(&parsed_addr.host).await?,
+            "wss" => {
+                let ssl_config = self
+                    .tls_connector_builder
+                    .build()
+                    .map_err(|e| WebSocketError::TlsConnectionError(e))?;
+                stream.into_tls(&parsed_addr.host, ssl_config).await?
+            }
             _ => return Err(WebSocketError::SchemeError),
         };
         let (read_half, write_half) = io::split(stream);
@@ -125,6 +137,65 @@ impl WebSocketBuilder {
     pub fn remove_subprotocol(&mut self, subprotocol: &str) -> &mut Self {
         // https://tools.ietf.org/html/rfc6455#section-1.9
         self.subprotocols.retain(|s| s != subprotocol);
+        self
+    }
+
+    /// Controls the use of certificate validation. Defaults to false.
+    pub fn danger_accept_invalid_certs(&mut self, accept_invalid_certs: bool) -> &mut Self {
+        self.tls_connector_builder
+            .danger_accept_invalid_certs(accept_invalid_certs);
+        self
+    }
+
+    /// Controls the use of hostname verification. Defaults to false.
+    pub fn danger_accept_invalid_hostnames(&mut self, accept_invalid_hostnames: bool) -> &mut Self {
+        self.tls_connector_builder
+            .danger_accept_invalid_hostnames(accept_invalid_hostnames);
+        self
+    }
+
+    /// Adds a certificate to the set of roots that the connector will trust.
+    /// The connector will use the system's trust root by default. This method can be used to add
+    /// to that set when communicating with servers not trusted by the system.
+    /// Defaults to an empty set.
+    pub fn add_root_certificate(&mut self, cert: TlsCertificate) -> &mut Self {
+        self.tls_connector_builder.add_root_certificate(cert);
+        self
+    }
+
+    /// Controls the use of built-in system certificates during certificate validation.
+    /// Defaults to false -- built-in system certs will be used.
+    pub fn disable_built_in_roots(&mut self, disable: bool) -> &mut Self {
+        self.tls_connector_builder.disable_built_in_roots(disable);
+        self
+    }
+
+    /// Sets the identity to be used for client certificate authentication.
+    pub fn identity(&mut self, identity: TlsIdentity) -> &mut Self {
+        self.tls_connector_builder.identity(identity);
+        self
+    }
+
+    /// Sets the maximum supported TLS protocol version.
+    /// A value of None enables support for the newest protocols supported by the implementation.
+    /// Defaults to None.
+    pub fn max_protocol_version(&mut self, protocol: Option<TlsProtocol>) -> &mut Self {
+        self.tls_connector_builder.max_protocol_version(protocol);
+        self
+    }
+
+    /// Sets the minimum supported TLS protocol version.
+    /// A value of None enables support for the oldest protocols supported by the implementation.
+    /// Defaults to Some(Protocol::Tlsv10).
+    pub fn min_protocol_version(&mut self, protocol: Option<TlsProtocol>) -> &mut Self {
+        self.tls_connector_builder.min_protocol_version(protocol);
+        self
+    }
+
+    /// Controls the use of Server Name Indication (SNI).
+    /// Defaults to true.
+    pub fn use_sni(&mut self, use_sni: bool) -> &mut Self {
+        self.tls_connector_builder.use_sni(use_sni);
         self
     }
 }

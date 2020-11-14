@@ -110,7 +110,7 @@ impl Default for FrameType {
 /// unless it is flushed. Events can be explicitly [`flush`](WebSocketWriteHalf::flush())ed,
 /// but sending a frame will also flush events. If frames are not being
 /// sent frequently, consider explicitly flushing events.
-/// 
+///
 /// Flushing is done automatically if you are using the the `WebSocket` type by itself.
 #[derive(Debug)]
 pub struct WebSocket {
@@ -147,7 +147,7 @@ impl WebSocket {
     /// For example, receiving a Ping frame will not queue a Pong frame to be sent,
     /// and receiving a Close frame will not queue a Close frame to be sent nor close
     /// the connection.
-    /// 
+    ///
     /// To automatically handle incoming frames, use the [`receive()`](WebSocket::receive())
     /// method instead.
     pub async fn receive_without_handling(&mut self) -> Result<Frame, WebSocketError> {
