@@ -53,7 +53,7 @@ const U64_MAX_MINUS_ONE: usize = (u64::MAX - 1) as usize;
 /// `false` and `fin` set to `false`, all other frames except the last frame should
 /// have `continuation` set to `true` and `fin` set to `false`, and the last frame should
 /// have `continuation` set to `true` and `fin` set to `true`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Frame {
     /// A Text frame
     Text {

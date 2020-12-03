@@ -13,6 +13,14 @@ pub enum WebSocketError {
     /// Error connecting using TLS
     #[error("could not connect using TLS")]
     TlsConnectionError(NativeTlsError),
+    /// Error building WebSocket with given TLS configuration
+    #[error("could not build WebSocket with given TLS configuration")]
+    TlsBuilderError(NativeTlsError),
+    /// Error creating a TLS configuration (such as in method calls on
+    /// [`TlsCertificate`](crate::secure::TlsCertificate) or
+    /// [`TlsIdentity`](crate::secure::TlsIdentity)
+    #[error("error with TLS configuration")]
+    TlsConfigurationError(NativeTlsError),
     /// Attempted to use the WebSocket when it is already closed
     #[error("websocket is already closed")]
     WebSocketClosedError,
