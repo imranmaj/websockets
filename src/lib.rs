@@ -32,11 +32,15 @@
 //!
 //! This project is licensed under the MIT license.
 
-#![forbid(unsafe_code, missing_debug_implementations, missing_docs)]
-#![deny(missing_debug_implementations)]
+#![forbid(
+    unsafe_code,
+    missing_debug_implementations,
+    missing_docs,
+    missing_debug_implementations
+)]
 
 mod error;
-mod secure;
+pub mod secure;
 mod websocket;
 
 pub use error::WebSocketError;
