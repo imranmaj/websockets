@@ -18,7 +18,7 @@ pub enum WebSocketError {
     TlsBuilderError(NativeTlsError),
     /// Error creating a TLS configuration (such as in method calls on
     /// [`TlsCertificate`](crate::secure::TlsCertificate) or
-    /// [`TlsIdentity`](crate::secure::TlsIdentity)
+    /// [`TlsIdentity`](crate::secure::TlsIdentity))
     #[error("error with TLS configuration")]
     TlsConfigurationError(NativeTlsError),
     /// Attempted to use the WebSocket when it is already closed
