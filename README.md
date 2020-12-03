@@ -28,3 +28,7 @@ Data is sent and received through `Frame`s.
 ## License
 
 This project is licensed under the MIT license.
+
+## Credits
+
+* Thank you to [@thsioutas](https://github.com/thsioutas) for adding support for custom TLS configuration
