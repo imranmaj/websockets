@@ -1,5 +1,6 @@
-use tokio::sync::mpsc::{Receiver, Sender};
+//use tokio::sync::mpsc::{Receiver, Sender};
 
+use flume::{Receiver, Sender};
 use rand_chacha::ChaCha20Rng;
 use tokio::io::{AsyncWriteExt, BufReader, BufWriter, ReadHalf, WriteHalf};
 
@@ -44,7 +45,7 @@ impl WebSocketReadHalf {
                     payload: payload.clone(),
                 };
                 self.sender
-                    .send(Event::SendPongFrame(pong)).await
+                    .send(Event::SendPongFrame(pong))
                     .map_err(|_e| WebSocketError::ChannelError)?;
             }
             // echo close frame and shutdown (https://tools.ietf.org/html/rfc6455#section-1.4)
@@ -55,7 +56,7 @@ impl WebSocketReadHalf {
                         .map(|(status_code, _reason)| (status_code.clone(), String::new())),
                 };
                 self.sender
-                    .send(Event::SendCloseFrameAndShutdown(close)).await
+                    .send(Event::SendCloseFrameAndShutdown(close))
                     .map_err(|_e| WebSocketError::ChannelError)?;
             }
             _ => (),

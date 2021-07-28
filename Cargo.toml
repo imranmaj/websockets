@@ -27,9 +27,13 @@ rand_chacha      = "0.2.2"
 regex            = "1.3.9"
 sha-1            = "0.9.1"
 thiserror        = "1.0.20"
-tokio            = { version = "0.2.21", features = ["tcp", "io-util", "sync"] }
-tokio-native-tls = "0.1.0"
+#tokio            = { version = "0.2.21", features = ["tcp", "io-util", "sync"] }
+tokio            = { version = "1.7", features = ["full"] }
+tokio-native-tls = "0.3.0"
+#tokio-native-tls = "0.1.0"
 url              = "2.1.1"
+flume            = "0.10.7"
 
 [dev-dependencies]
-tokio = { version = "0.2.21", features = ["rt-core", "macros"] }
+#tokio = { version = "0.2.21", features = ["rt-core", "macros"] }
+tokio = { version = "1.7", features = ["full"] }
