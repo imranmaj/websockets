@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 use std::fmt::{Debug, Error as FmtError, Formatter};
-use std::sync::mpsc;
+use tokio::sync::mpsc;
 
 use native_tls::{
     TlsConnector as NativeTlsTlsConnector, TlsConnectorBuilder as NativeTlsTlsConnectorBuilder,
@@ -40,6 +40,7 @@ pub struct WebSocketBuilder {
     additional_handshake_headers: Vec<(String, String)>,
     subprotocols: Vec<String>,
     tls_connector_builder: NativeTlsTlsConnectorBuilder,
+    recv_buffer: usize,
 }
 
 impl Debug for WebSocketBuilder {
@@ -54,6 +55,7 @@ impl WebSocketBuilder {
             additional_handshake_headers: Vec::new(),
             subprotocols: Vec::new(),
             tls_connector_builder: NativeTlsTlsConnector::builder(),
+            recv_buffer: 100,
         }
     }
 
@@ -83,7 +85,7 @@ impl WebSocketBuilder {
             _ => return Err(WebSocketError::SchemeError),
         };
         let (read_half, write_half) = io::split(stream);
-        let (sender, receiver) = mpsc::channel();
+        let (sender, receiver) = mpsc::channel(self.recv_buffer);
         let mut ws = WebSocket {
             read_half: WebSocketReadHalf {
                 stream: BufReader::new(read_half),
@@ -115,6 +117,13 @@ impl WebSocketBuilder {
                 Err(e)
             }
         }
+    }
+
+    /// Change the buffer size for the receiver channel.
+    /// Default size is 100.
+    pub fn recv_buffer(&mut self, buffer: usize) -> &mut Self {
+        self.recv_buffer = buffer;
+        self
     }
 
     /// Adds a header to be sent in the WebSocket handshake.
