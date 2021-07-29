@@ -2,7 +2,7 @@ use native_tls::TlsConnector as NativeTlsTlsConnector;
 use std::io::Error as IoError;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::net::TcpStream;
 use tokio_native_tls::{TlsConnector as TokioTlsConnector, TlsStream};
 
@@ -52,8 +52,8 @@ impl AsyncRead for Stream {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<Result<usize, IoError>> {
+        buf: &mut ReadBuf,
+    ) -> Poll<Result<(), std::io::Error>> {
         match self.get_mut() {
             Self::Plain(tcp_stream) => Pin::new(tcp_stream).poll_read(cx, buf),
             Self::Tls(tls_stream) => Pin::new(tls_stream).poll_read(cx, buf),

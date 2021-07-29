@@ -1,6 +1,5 @@
 use std::convert::TryFrom;
 use std::fmt::{Debug, Error as FmtError, Formatter};
-use std::sync::mpsc;
 
 use native_tls::{
     TlsConnector as NativeTlsTlsConnector, TlsConnectorBuilder as NativeTlsTlsConnectorBuilder,
@@ -83,7 +82,7 @@ impl WebSocketBuilder {
             _ => return Err(WebSocketError::SchemeError),
         };
         let (read_half, write_half) = io::split(stream);
-        let (sender, receiver) = mpsc::channel();
+        let (sender, receiver) = flume::unbounded();
         let mut ws = WebSocket {
             read_half: WebSocketReadHalf {
                 stream: BufReader::new(read_half),
