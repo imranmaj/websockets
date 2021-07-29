@@ -1,9 +1,9 @@
 use native_tls::TlsConnector as NativeTlsTlsConnector;
-use tokio::net::TcpStream;
 use std::io::Error as IoError;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::net::TcpStream;
 use tokio_native_tls::{TlsConnector as TokioTlsConnector, TlsStream};
 
 use crate::error::WebSocketError;

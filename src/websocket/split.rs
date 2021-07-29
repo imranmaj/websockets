@@ -1,5 +1,3 @@
-//use tokio::sync::mpsc::{Receiver, Sender};
-
 use flume::{Receiver, Sender};
 use rand_chacha::ChaCha20Rng;
 use tokio::io::{AsyncWriteExt, BufReader, BufWriter, ReadHalf, WriteHalf};
@@ -220,5 +218,18 @@ impl WebSocketWriteHalf {
     pub async fn send_pong(&mut self, payload: Option<Vec<u8>>) -> Result<(), WebSocketError> {
         // https://tools.ietf.org/html/rfc6455#section-5.5.3
         self.send(Frame::Pong { payload }).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assert_send_sync()
+    where
+        WebSocketReadHalf: Send + Sync,
+        WebSocketWriteHalf: Send + Sync,
+    {
     }
 }

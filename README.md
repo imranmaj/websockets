@@ -32,3 +32,4 @@ This project is licensed under the MIT license.
 ## Credits
 
 * Thank you to [@thsioutas](https://github.com/thsioutas) for adding support for custom TLS configuration
+* Thank you to [@secana](https://github.com/secana) for making the write half `Send`
